@@ -126,9 +126,9 @@ mat4 mat_invert(mat4 m)
 mat4 mat_translate(mat4 m, vec3 pos)
 {
 	const mat4 result = {
-		{1, 0, 0, 0},
-		{0, 1, 0, 0},
-		{0, 0, 1, 0},
+		{1,     0,     0,     0},
+		{0,     1,     0,     0},
+		{0,     0,     1,     0},
 		{pos.x, pos.y, pos.z, 1}};
 
 	return mat_mul(result, m);
@@ -136,42 +136,42 @@ mat4 mat_translate(mat4 m, vec3 pos)
 
 mat4 mat_rotate_x(mat4 m, float rad)
 {
-	float cosRad = cos(rad);
-	float sinRad = sin(rad);
+	float c = cos(rad);
+	float s = sin(rad);
 
 	const mat4 result = {
-		{1, 0, 0, 0},
-		{0, cosRad, -sinRad, 0},
-		{0, sinRad, cosRad, 0},
-		{0, 0, 0, 1}};
+		{1,  0,  0,  0},
+		{0,  c, -s,  0},
+		{0,  s,  c,  0},
+		{0,  0,  0,  1}};
 
 	return mat_mul(result, m);
 }
 
 mat4 mat_rotate_y(mat4 m, float rad)
 {
-	const float cosRad = cos(rad);
-	const float sinRad = sin(rad);
+	const float c = cos(rad);
+	const float s = sin(rad);
 
 	const mat4 result = {
-		{cosRad, 0, sinRad, 0},
-		{0, 1, 0, 0},
-		{-sinRad, 0, cosRad, 0},
-		{0, 0, 0, 1}};
+		{c,  0,  s,  0},
+		{0,  1,  0,  0},
+		{-s, 0,  c,  0},
+		{0,  0,  0,  1}};
 
 	return mat_mul(result, m);
 }
 
 mat4 mat_rotate_z(mat4 m, float rad)
 {
-	const float cosRad = cos(rad);
-	const float sinRad = sin(rad);
+	const float c = cos(rad);
+	const float s = sin(rad);
 
 	const mat4 result = {
-		{cosRad, -sinRad, 0, 0},
-		{sinRad, cosRad, 0, 0},
-		{0, 0, 1, 0},
-		{0, 0, 0, 1}};
+		{c, -s,  0,  0},
+		{s,  c,  0,  0},
+		{0,  0,  1,  0},
+		{0,  0,  0,  1}};
 
 	return mat_mul(result, m);
 }
