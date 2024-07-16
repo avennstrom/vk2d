@@ -258,6 +258,14 @@ int CreateVulkanContext(vulkan_t* vulkan, VkInstance instance, VkSurfaceKHR surf
 	return 0;
 }
 
+void DestroyVulkanContext(vulkan_t* vulkan)
+{
+	vkDestroySampler(vulkan->device, vulkan->pointClampSampler, NULL);
+	vkDestroySampler(vulkan->device, vulkan->linearClampSampler, NULL);
+	vkDestroyCommandPool(vulkan->device, vulkan->commandPool, NULL);
+	vkDestroyDevice(vulkan->device, NULL);
+}
+
 uint32_t FindMemoryType(vulkan_t* vulkan, uint32_t typeFilter, VkMemoryPropertyFlags properties)
 {
 	VkPhysicalDeviceMemoryProperties memProperties;

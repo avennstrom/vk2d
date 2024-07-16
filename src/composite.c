@@ -146,7 +146,7 @@ static int create_composite_pipeline(composite_t* composite, vulkan_t* vulkan)
 	return 0;
 }
 
-composite_t* create_composite(vulkan_t* vulkan)
+composite_t* composite_create(vulkan_t* vulkan)
 {
 	composite_t* composite = calloc(1, sizeof(composite_t));
 	if (composite == NULL) {
@@ -159,6 +159,13 @@ composite_t* create_composite(vulkan_t* vulkan)
 	return composite;
 }
 
+void composite_destroy(composite_t* composite, vulkan_t* vulkan)
+{
+	vkDestroyPipeline(vulkan->device, composite->pipeline, NULL);
+	vkDestroyPipelineLayout(vulkan->device, composite->pipelineLayout, NULL);
+	vkDestroyDescriptorSetLayout(vulkan->device, composite->descriptorSetLayout, NULL);
+}
+
 void draw_composite(
 	VkCommandBuffer cb,
 	vulkan_t* vulkan,
@@ -167,9 +174,9 @@ void draw_composite(
 	render_targets_t* rt,
 	VkImageView backbuffer)
 {
-	StartBindingDescriptors(dsalloc, composite->descriptorSetLayout, "Composite");
-	BindCombinedImageSampler(dsalloc, 0, (VkDescriptorImageInfo){ .sampler = vulkan->pointClampSampler, .imageView = rt->sceneColor.view, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
-	VkDescriptorSet descriptorSet = FinishBindingDescriptors(dsalloc);
+	descriptor_allocator_begin(dsalloc, composite->descriptorSetLayout, "Composite");
+	descriptor_allocator_set_combined_image_sampler(dsalloc, 0, (VkDescriptorImageInfo){ .sampler = vulkan->pointClampSampler, .imageView = rt->sceneColor.view, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+	VkDescriptorSet descriptorSet = descriptor_allocator_end(dsalloc);
 
 	const VkRenderingAttachmentInfo colorAttachments[] = {
 		{

@@ -2,6 +2,8 @@
 
 #include "vulkan.h"
 
+#define MAX_STAGING_ALLOCATIONS 64
+
 typedef struct staging_memory_allocator
 {
 	vulkan_t*		vulkan;
@@ -10,11 +12,11 @@ typedef struct staging_memory_allocator
 	size_t			count;
 	uint32_t		memoryTypeBits;
 
-	VkBuffer		handles[64];
-	const char*		names[64];
-	VkDeviceSize	offsets[64];
-	VkDeviceSize	sizes[64];
-	void**			maps[64];
+	VkBuffer		handles[MAX_STAGING_ALLOCATIONS];
+	const char*		names[MAX_STAGING_ALLOCATIONS];
+	VkDeviceSize	offsets[MAX_STAGING_ALLOCATIONS];
+	VkDeviceSize	sizes[MAX_STAGING_ALLOCATIONS];
+	void**			maps[MAX_STAGING_ALLOCATIONS];
 } staging_memory_allocator_t;
 
 typedef struct staging_memory_allocation
@@ -26,7 +28,7 @@ typedef struct staging_memory_allocation
 typedef struct staging_memory_context {
 	staging_memory_allocation_t	allocation;
 	size_t						flushCount;
-	VkMappedMemoryRange			flushRanges[64];
+	VkMappedMemoryRange			flushRanges[256];
 } staging_memory_context_t;
 
 void ResetStagingMemoryAllocator(

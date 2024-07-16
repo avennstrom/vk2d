@@ -1,0 +1,22 @@
+{
+    "editor.insertSpaces": false,
+	"editor.detectIndentation": false,
+	"files.associations": {
+		"cstdlib": "c",
+		"memory": "c",
+		"spirv_reflect.h": "c",
+		"util.h": "c",
+		"common.h": "c",
+		"assert.h": "c",
+		"scene.h": "c",
+		"vulkan.h": "c",
+		"vulkan_core.h": "c",
+		"composite.h": "c",
+		"delta_time.h": "c",
+		"staging_memory.h": "c",
+		"jsmn.h": "c",
+		"stdio.h": "c",
+		"time.h": "c",
+		"gpu_types.h": "c"
+	}
+}

@@ -5,7 +5,6 @@
 #include "shaders.h"
 #include "color.h"
 #include "debug_renderer.h"
-#include "worldgen.h"
 #include "descriptors.h"
 #include "mat.h"
 #include "game.h"
@@ -14,14 +13,14 @@
 #include "staging_memory.h"
 #include "composite.h"
 #include "delta_time.h"
-#include "painter.h"
+#include "tests.h"
+#include "model_loader.h"
 
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <time.h>
 #include <float.h>
 #include <string.h>
 
@@ -98,7 +97,7 @@ static void DestroySwapchain(swapchain_t* swapchain, vulkan_t *vulkan);
 // 	};
 // }
 
-int InitFrame(frame_t *frame, vulkan_t *vulkan)
+int InitFrame(frame_t* frame, vulkan_t* vulkan)
 {
 	VkResult r;
 
@@ -143,6 +142,14 @@ int InitFrame(frame_t *frame, vulkan_t *vulkan)
 	return 0;
 }
 
+void DeinitFrame(frame_t* frame, vulkan_t* vulkan)
+{
+	vkDestroySemaphore(vulkan->device, frame->backbufferDone, NULL);
+	vkDestroySemaphore(vulkan->device, frame->backbufferAvailable, NULL);
+	vkDestroyFence(vulkan->device, frame->fence, NULL);
+	vkFreeCommandBuffers(vulkan->device, vulkan->commandPool, 1, &frame->cb);
+}
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugMessageCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -155,6 +162,21 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugMessageCallback(
 
 int main(int argc, char **argv)
 {
+	bool runTests = false;
+
+	for (int i = 0; i < argc; ++i)
+	{
+		if (strcmp(argv[i], "--test") == 0)
+		{
+			runTests = true;
+		}
+	}
+
+	if (runTests)
+	{
+		return run_tests();
+	}
+
 	srand(time(NULL));
 
 	app_t app = {};
@@ -174,7 +196,7 @@ int main(int argc, char **argv)
 	const char *instanceExtensions[] = {
 		VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 		VK_KHR_SURFACE_EXTENSION_NAME,
-		getWindowSurfaceExtensionName(),
+		window_get_surface_extension_name(),
 	};
 
 	const VkInstanceCreateInfo instanceInfo = {
@@ -216,14 +238,14 @@ int main(int argc, char **argv)
 
 	VkExtent2D resolution = {1280, 720};
 
-	window_t* window = createWindow(resolution.width, resolution.height);
+	window_t* window = window_create(resolution.width, resolution.height);
 	if (window == NULL)
 	{
 		fprintf(stderr, "Failed to create OS window\n");
 		return 1;
 	}
 
-	VkSurfaceKHR surface = createWindowSurface(instance, window);
+	VkSurfaceKHR surface = window_create_surface(instance, window);
 	if (surface == VK_NULL_HANDLE)
 	{
 		fprintf(stderr, "Failed to create window surface\n");
@@ -243,7 +265,7 @@ int main(int argc, char **argv)
 	assert(r == 0);
 
 	render_targets_t rt = {};
-	r = CreateRenderTargets(&rt, &vulkan, resolution);
+	r = render_targets_create(&rt, &vulkan, resolution);
 	assert(r == 0);
 
 	r = InitShaderLibrary(&vulkan);
@@ -255,19 +277,20 @@ int main(int argc, char **argv)
 		.maxTriangles = 128 * 1024,
 	};
 	debug_renderer_t debugRenderer = {};
-	r = CreateDebugRenderer(&debugRenderer, &vulkan, &debugRendererConfig);
+	r = debug_renderer_create(&debugRenderer, &vulkan, &debugRendererConfig);
 	assert(r == 0);
 
+	for (uint32_t i = 0; i < FRAME_COUNT; ++i)
 	{
-		for (uint32_t i = 0; i < countof(app.frames); ++i)
+		frame_t *frame = &app.frames[i];
+		if (InitFrame(frame, &vulkan) != 0)
 		{
-			frame_t *frame = &app.frames[i];
-			if (InitFrame(frame, &vulkan) != 0)
-			{
-				return 1;
-			}
+			return 1;
 		}
 	}
+	
+	model_loader_t* modelLoader = model_loader_create(&vulkan);
+	assert(modelLoader != NULL);
 
 	const uint32_t maxDescriptorSets = 1024;
 
@@ -290,31 +313,30 @@ int main(int argc, char **argv)
 	}
 
 	descriptor_set_cache_t dscache;
-	CreateDescriptorSetCache(&dscache, descriptorPool, maxDescriptorSets);
+	descriptor_set_cache_create(&dscache, descriptorPool, maxDescriptorSets);
 
 	descriptor_allocator_t dsalloc;
-	CreateDescriptorAllocator(&dsalloc, &dscache, &vulkan, 64);
+	descriptor_allocator_create(&dsalloc, &dscache, &vulkan, 64);
 
 	uint64_t frameId = 0;
 
-	worldgen_t* worldgen = CreateWorldgen(&vulkan);
-	painter_t* painter = CreatePainter(&vulkan);
-	game_t *game = game_create(window, worldgen);
-	scene_t *scene = new_scene(&vulkan);
-	composite_t* composite = create_composite(&vulkan);
+	game_t *game = game_create(window);
+	scene_t *scene = scene_create(&vulkan);
+	composite_t* composite = composite_create(&vulkan);
 
 	staging_memory_allocator_t staging_allocator;
 	ResetStagingMemoryAllocator(&staging_allocator, &vulkan);
-	AllocateSceneStagingMemory(&staging_allocator, scene);
+	scene_alloc_staging_mem(&staging_allocator, scene);
 	AllocateDebugRendererStagingMemory(&staging_allocator, &debugRenderer);
-	AllocateWorldgenStagingMemory(&staging_allocator, worldgen);
-	AllocatePainterStagingMemory(&staging_allocator, painter);
+	model_loader_alloc_staging_mem(&staging_allocator, modelLoader);
 
 	staging_memory_allocation_t stagingAllocation;
 	FinalizeStagingMemoryAllocator(&stagingAllocation, &staging_allocator);
 
 	delta_timer_t deltaTimer;
-	ResetDeltaTime(&deltaTimer);
+	delta_timer_reset(&deltaTimer);
+
+	bool shutdown = false;
 
 	for (;;)
 	{
@@ -322,9 +344,26 @@ int main(int argc, char **argv)
 		// ---- poll events ----
 		//
 		window_event_t event;
-		while (pollWindowEvent(&event, window))
+		while (window_poll(&event, window))
 		{
+			if (event.type == WINDOW_EVENT_NULL)
+			{
+				continue;
+			}
+
+			if (event.type == WINDOW_EVENT_DESTROY)
+			{
+				printf("WINDOW_EVENT_DESTROY\n");
+				shutdown = true;
+				break;
+			}
+
 			game_window_event(game, &event);
+		}
+
+		if (shutdown)
+		{
+			break;
 		}
 
 		//
@@ -363,18 +402,16 @@ int main(int argc, char **argv)
 		//
 		// --- game logic ---
 		//
-		const float deltaTime = (float)CaptureDeltaTime(&deltaTimer);
+		const float deltaTime = (float)delta_timer_capture(&deltaTimer);
 
 		MakeCurrentDebugRenderer(&debugRenderer);
 		
-		TickPainter(painter, frameId);
-		TickWorldgen(worldgen);
 		TickGame(game, deltaTime);
 
 		//
 		// ---- render ----
 		//
-		UpdateDescriptorSetCache(&dscache, frameId);
+		descriptor_set_cache_update(&dscache, frameId);
 
 		staging_memory_context_t stagingMemoryContext;
 		ResetStagingMemoryContext(&stagingMemoryContext, &stagingAllocation);
@@ -392,29 +429,46 @@ int main(int argc, char **argv)
 		};
 		vkr = vkBeginCommandBuffer(cb, &cbBeginInfo);
 		assert(vkr == VK_SUCCESS);
+		
+		const render_context_t rc = {
+			.frameIndex = app.currentFrame,
+			.vulkan = &vulkan,
+			.stagingMemory = &stagingMemoryContext,
+			.dsalloc = &dsalloc,
+			.rt = &rt,
+			.modelLoader = modelLoader,
+		};
 
-		DrawDebugLine((debug_vertex_t){0.0f, 0.0f, 0.0f, COLOR_RED}, (debug_vertex_t){5.0f, 0.0f, 0.0f, COLOR_RED});
-		DrawDebugLine((debug_vertex_t){0.0f, 0.0f, 0.0f, COLOR_GREEN}, (debug_vertex_t){0.0f, 5.0f, 0.0f, COLOR_GREEN});
-		DrawDebugLine((debug_vertex_t){0.0f, 0.0f, 0.0f, COLOR_BLUE}, (debug_vertex_t){0.0f, 0.0f, 5.0f, COLOR_BLUE});
+		model_loader_update(cb, modelLoader, &rc);
 
-		RenderPaintings(
-			cb,
-			painter,
-			&stagingMemoryContext,
-			frameId);
+		{
+			const VkMemoryBarrier memoryBarriers[] = {
+				{
+					.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+					.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+					.dstAccessMask = VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_SHADER_READ_BIT,
+				},
+			};
+			vkCmdPipelineBarrier(
+				cb,
+				VK_PIPELINE_STAGE_TRANSFER_BIT,
+				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+				0,
+				countof(memoryBarriers), memoryBarriers,
+				0, NULL,
+				0, NULL);
+		}
 
-		DrawScene(
+		DrawDebugLine((debug_vertex_t){0.0f, 0.0f, 0.0f, COLOR_RED}, (debug_vertex_t){1.0f, 0.0f, 0.0f, COLOR_RED});
+		DrawDebugLine((debug_vertex_t){0.0f, 0.0f, 0.0f, COLOR_GREEN}, (debug_vertex_t){0.0f, 1.0f, 0.0f, COLOR_GREEN});
+		DrawDebugLine((debug_vertex_t){0.0f, 0.0f, 0.0f, COLOR_BLUE}, (debug_vertex_t){0.0f, 0.0f, 1.0f, COLOR_BLUE});
+
+		scene_draw(
 			cb, 
 			scene,
-			&vulkan,
-			&rt, 
 			scb, 
-			&dsalloc,
-			&stagingMemoryContext,
-			&debugRenderer,
-			worldgen,
-			painter,
-			app.currentFrame);
+			&rc,
+			&debugRenderer);
 
 		const VkImage backbufferImage = swapchain.backbuffer[imageIndex];
 		const VkImageView backbufferView = swapchain.backbufferView[imageIndex];
@@ -448,14 +502,15 @@ int main(int argc, char **argv)
 						.layerCount = 1,
 						.levelCount = 1,
 					},
-				}};
+				},
+			};
 			vkCmdPipelineBarrier(cb,
-								 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-								 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-								 0,
-								 0, NULL,
-								 0, NULL,
-								 countof(imageBarriers), imageBarriers);
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				0,
+				0, NULL,
+				0, NULL,
+				countof(imageBarriers), imageBarriers);
 		}
 		
 		draw_composite(
@@ -481,14 +536,15 @@ int main(int argc, char **argv)
 						.layerCount = 1,
 						.levelCount = 1,
 					},
-				}};
+				},
+			};
 			vkCmdPipelineBarrier(cb,
-								 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-								 0,
-								 0, NULL,
-								 0, NULL,
-								 countof(imageBarriers), imageBarriers);
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				0,
+				0, NULL,
+				0, NULL,
+				countof(imageBarriers), imageBarriers);
 		}
 
 		vkr = vkEndCommandBuffer(cb);
@@ -528,18 +584,23 @@ int main(int argc, char **argv)
 		vkr = vkQueuePresentKHR(vulkan.mainQueue, &presentInfo);
 		if (vkr == VK_ERROR_OUT_OF_DATE_KHR)
 		{
+			vkQueueWaitIdle(vulkan.mainQueue);
+			DestroySwapchain(&swapchain, &vulkan);
+			render_targets_destroy(&rt, &vulkan);
+
 			// query new resolution
 			VkSurfaceCapabilitiesKHR surfaceCapabilities;
 			vkr = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vulkan.physicalDevice, surface, &surfaceCapabilities);
-			assert(vkr == VK_SUCCESS);
+			if (vkr != VK_SUCCESS)
+			{
+				//printf("No surface capabilities found. Assuming window was destroyed. Shutting down...\n");
+				break;
+			}
 			assert(surfaceCapabilities.minImageExtent.width == surfaceCapabilities.maxImageExtent.width);
 			assert(surfaceCapabilities.minImageExtent.height == surfaceCapabilities.maxImageExtent.height);
 			resolution = surfaceCapabilities.maxImageExtent;
 
-			vkQueueWaitIdle(vulkan.mainQueue);
-			DestroySwapchain(&swapchain, &vulkan);
-			DestroyRenderTargets(&rt, &vulkan);
-			CreateRenderTargets(&rt, &vulkan, resolution);
+			render_targets_create(&rt, &vulkan, resolution);
 			CreateSwapchain(&swapchain, &vulkan, surface, resolution);
 		}
 		else
@@ -559,14 +620,39 @@ int main(int argc, char **argv)
 
 	vkDeviceWaitIdle(vulkan.device);
 
-	destroyWindow(window);
+	window_destroy(window);
+
+	DestroySwapchain(&swapchain, &vulkan);
 	vkDestroySurfaceKHR(instance, surface, NULL);
-	vkDestroyDevice(vulkan.device, NULL);
+
+	render_targets_destroy(&rt, &vulkan);
+
+	for (uint32_t i = 0; i < FRAME_COUNT; ++i)
+	{
+		DeinitFrame(&app.frames[i], &vulkan);
+	}
+
+	model_loader_destroy(modelLoader);
+	debug_renderer_destroy(&debugRenderer, &vulkan);
+	scene_destroy(scene);
+	composite_destroy(composite, &vulkan);
+	descriptor_set_cache_destroy(&dscache, &vulkan);
+	vkDestroyDescriptorPool(vulkan.device, descriptorPool, NULL);
+
+	vkUnmapMemory(vulkan.device, stagingAllocation.memory);
+	vkFreeMemory(vulkan.device, stagingAllocation.memory, NULL);
+
+	DeinitShaderLibrary(&vulkan);
+	DestroyVulkanContext(&vulkan);
+
 	if (vkDestroyDebugUtilsMessengerEXT != NULL)
 	{
 		vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, NULL);
 	}
+
 	vkDestroyInstance(instance, NULL);
+
+	printf("Goodbye\n");
 	return 0;
 }
 

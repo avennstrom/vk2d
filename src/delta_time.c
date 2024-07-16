@@ -2,12 +2,12 @@
 
 #include <time.h>
 
-void ResetDeltaTime(delta_timer_t* timer)
+void delta_timer_reset(delta_timer_t* timer)
 {
 	clock_gettime(CLOCK_MONOTONIC_RAW, &timer->ts);
 }
 
-double CaptureDeltaTime(delta_timer_t* timer)
+double delta_timer_capture(delta_timer_t* timer)
 {
 	struct timespec now;
 	struct timespec then;

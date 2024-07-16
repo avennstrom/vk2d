@@ -10,6 +10,7 @@ typedef struct dedicated_render_target {
 	VkDeviceMemory memory;
 	VkImage image;
 	VkImageView view;
+	image_state_t state;
 } dedicated_render_target_t;
 
 typedef struct render_targets {
@@ -31,11 +32,11 @@ void destroy_dedicated_render_target(
 	dedicated_render_target_t* rt,
 	vulkan_t *vulkan);
 
-int CreateRenderTargets(
+int render_targets_create(
 	render_targets_t *rt,
 	vulkan_t *vulkan,
 	VkExtent2D resolution);
 
-void DestroyRenderTargets(
+void render_targets_destroy(
 	render_targets_t *rt,
 	vulkan_t *vulkan);

@@ -36,6 +36,7 @@ enum window_event_type {
 	WINDOW_EVENT_BUTTON_DOWN,
 	WINDOW_EVENT_BUTTON_UP,
 	WINDOW_EVENT_MOUSE_MOVE,
+	WINDOW_EVENT_DESTROY,
 };
 
 struct window_event {
@@ -59,10 +60,9 @@ struct window_event {
 	} data;
 };
 
-const char* getWindowSurfaceExtensionName();
-window_t* createWindow(uint32_t width, uint32_t height);
-void destroyWindow(window_t* window);
-//void* getNativeWindowHandle(window_t* window);
-VkSurfaceKHR createWindowSurface(VkInstance instance, window_t* window);
-bool pollWindowEvent(window_event_t* event, window_t* window);
-void setMouseLock(window_t* window, bool lock);
+const char* window_get_surface_extension_name();
+window_t* window_create(uint32_t width, uint32_t height);
+void window_destroy(window_t* window);
+VkSurfaceKHR window_create_surface(VkInstance instance, window_t* window);
+bool window_poll(window_event_t* event, window_t* window);
+void window_lock_mouse(window_t* window, bool lock);

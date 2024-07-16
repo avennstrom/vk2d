@@ -21,10 +21,10 @@ SHADER_BLOB(world_vert);
 SHADER_BLOB(world_frag);
 SHADER_BLOB(world_shadow_vert);
 SHADER_BLOB(world_shadow_geom);
-SHADER_BLOB(painter_vert);
-SHADER_BLOB(painter_frag);
+SHADER_BLOB(model_vs);
+SHADER_BLOB(model_fs);
 
-shader_library_t g_shaders;
+shader_library_t g_shaders = {};
 
 static VkShaderModule createShaderModule(vulkan_t* vulkan, const char* spirvStart, const char* spirvEnd, const char* debugName)
 {
@@ -60,7 +60,15 @@ int InitShaderLibrary(vulkan_t* vulkan)
 	g_shaders.modules[SHADER_WORLD_FRAG] = createShaderModule(vulkan, SHADER_ARG_HELPER(world_frag));
 	g_shaders.modules[SHADER_WORLD_SHADOW_VERT] = createShaderModule(vulkan, SHADER_ARG_HELPER(world_shadow_vert));
 	g_shaders.modules[SHADER_WORLD_SHADOW_GEOM] = createShaderModule(vulkan, SHADER_ARG_HELPER(world_shadow_geom));
-	g_shaders.modules[SHADER_PAINTER_VERT] = createShaderModule(vulkan, SHADER_ARG_HELPER(painter_vert));
-	g_shaders.modules[SHADER_PAINTER_FRAG] = createShaderModule(vulkan, SHADER_ARG_HELPER(painter_frag));
+	g_shaders.modules[SHADER_MODEL_VERT] = createShaderModule(vulkan, SHADER_ARG_HELPER(model_vs));
+	g_shaders.modules[SHADER_MODEL_FRAG] = createShaderModule(vulkan, SHADER_ARG_HELPER(model_fs));
 	return 0;
+}
+
+void DeinitShaderLibrary(vulkan_t* vulkan)
+{
+	for (int i = 0; i < SHADER_COUNT; ++i)
+	{
+		vkDestroyShaderModule(vulkan->device, g_shaders.modules[i], NULL);
+	}
 }

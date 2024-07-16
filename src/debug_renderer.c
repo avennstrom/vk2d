@@ -1,5 +1,4 @@
 #include "debug_renderer.h"
-#include "common.h"
 #include "util.h"
 #include "shaders.h"
 #include "staging_memory.h"
@@ -20,7 +19,7 @@
 
 static int CreateDebugPipeline(VkPipeline* pipeline, vulkan_t* vulkan, VkPipelineLayout pipelineLayout, VkPrimitiveTopology topology);
 
-int CreateDebugRenderer(debug_renderer_t* debugRenderer, vulkan_t* vulkan, const debug_renderer_config_t* config)
+int debug_renderer_create(debug_renderer_t* debugRenderer, vulkan_t* vulkan, const debug_renderer_config_t* config)
 {
 	int r;
 
@@ -51,16 +50,6 @@ int CreateDebugRenderer(debug_renderer_t* debugRenderer, vulkan_t* vulkan, const
 	debugRenderer->maxLines				= config->maxLines;
 	debugRenderer->maxTriangles			= config->maxTriangles;
 
-	// debugRenderer->uploadBuffer = CreateBuffer(
-	// 	&debugRenderer->uploadMemory,
-	// 	vulkan,
-	// 	FRAME_COUNT * debugRenderer->frameStagingStride, 
-	// 	VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-	// 	VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-	// r = vkMapMemory(vulkan->device, debugRenderer->uploadMemory, 0, VK_WHOLE_SIZE, 0, &debugRenderer->uploadData);
-	// assert(r == VK_SUCCESS);
-
 	r = CreateDebugPipeline(&debugRenderer->pointPipeline, vulkan, debugRenderer->pipelineLayout, VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
 	assert(r == 0);
 	r = CreateDebugPipeline(&debugRenderer->linePipeline, vulkan, debugRenderer->pipelineLayout, VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
@@ -73,6 +62,20 @@ int CreateDebugRenderer(debug_renderer_t* debugRenderer, vulkan_t* vulkan, const
 	debugRenderer->triangleVertices = calloc(config->maxTriangles * 3, sizeof(debug_vertex_t));
 
 	return 0;
+}
+
+void debug_renderer_destroy(debug_renderer_t* debugRenderer, vulkan_t* vulkan)
+{
+	for (size_t i = 0; i < FRAME_COUNT; ++i) {
+		debug_renderer_frame_t* frame = &debugRenderer->frames[i];
+		vkDestroyBuffer(vulkan->device, frame->vertexBuffer, NULL);
+	}
+
+	vkDestroyPipeline(vulkan->device, debugRenderer->pointPipeline, NULL);
+	vkDestroyPipeline(vulkan->device, debugRenderer->linePipeline, NULL);
+	vkDestroyPipeline(vulkan->device, debugRenderer->trianglePipeline, NULL);
+	vkDestroyPipelineLayout(vulkan->device, debugRenderer->pipelineLayout, NULL);
+	vkDestroyDescriptorSetLayout(vulkan->device, debugRenderer->descriptorSetLayout, NULL);
 }
 
 int AllocateDebugRendererStagingMemory(staging_memory_allocator_t* allocator, debug_renderer_t* debugRenderer)
@@ -112,9 +115,9 @@ void FlushDebugRenderer(
 	const VkDeviceSize lineBufferOffset = lineVertexOffset * sizeof(debug_vertex_t);
 	const VkDeviceSize triangleBufferOffset = triangleVertexOffset * sizeof(debug_vertex_t);
 
-	StartBindingDescriptors(dsalloc, debugRenderer->descriptorSetLayout, "Debug Renderer");
-	BindUniformBuffer(dsalloc, 0, frameUniformBuffer);
-	VkDescriptorSet descriptorSet = FinishBindingDescriptors(dsalloc);
+	descriptor_allocator_begin(dsalloc, debugRenderer->descriptorSetLayout, "Debug Renderer");
+	descriptor_allocator_set_uniform_buffer(dsalloc, 0, frameUniformBuffer);
+	VkDescriptorSet descriptorSet = descriptor_allocator_end(dsalloc);
 
 	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, debugRenderer->pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 

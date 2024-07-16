@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-int CreateDescriptorSetCache(descriptor_set_cache_t* cache, VkDescriptorPool pool, size_t maxEntries)
+int descriptor_set_cache_create(descriptor_set_cache_t* cache, VkDescriptorPool pool, size_t maxEntries)
 {
 	memset(cache, 0, sizeof(descriptor_set_cache_t));
 	cache->pool = pool;
@@ -18,12 +18,21 @@ int CreateDescriptorSetCache(descriptor_set_cache_t* cache, VkDescriptorPool poo
 	return 0;
 }
 
-void UpdateDescriptorSetCache(descriptor_set_cache_t* cache, uint64_t frameId)
+void descriptor_set_cache_destroy(descriptor_set_cache_t* cache, vulkan_t* vulkan)
+{
+	//vkFreeDescriptorSets(vulkan->device, cache->pool, cache->count, cache->sets);
+
+	free(cache->frameIds);
+	free(cache->layouts);
+	free(cache->sets);
+}
+
+void descriptor_set_cache_update(descriptor_set_cache_t* cache, uint64_t frameId)
 {
 	cache->currentFrame = frameId;
 }
 
-int CreateDescriptorAllocator(descriptor_allocator_t* allocator, descriptor_set_cache_t* cache, vulkan_t* vulkan, size_t maxWrites)
+int descriptor_allocator_create(descriptor_allocator_t* allocator, descriptor_set_cache_t* cache, vulkan_t* vulkan, size_t maxWrites)
 {
 	memset(allocator, 0, sizeof(descriptor_allocator_t));
 	allocator->cache = cache;
@@ -74,7 +83,7 @@ static VkDescriptorSet AllocateDescriptorSet(descriptor_set_cache_t* cache, vulk
 	return set;
 }
 
-void StartBindingDescriptors(
+void descriptor_allocator_begin(
 	descriptor_allocator_t* allocator,
 	VkDescriptorSetLayout layout,
 	const char* debugName)
@@ -87,7 +96,7 @@ void StartBindingDescriptors(
 	assert(allocator->currentSet != VK_NULL_HANDLE);
 }
 
-void BindUniformBuffer(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorBufferInfo info)
+void descriptor_allocator_set_uniform_buffer(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorBufferInfo info)
 {
 	assert(allocator->currentSet != VK_NULL_HANDLE);
 
@@ -106,7 +115,7 @@ void BindUniformBuffer(descriptor_allocator_t* allocator, uint32_t binding, VkDe
 	};
 }
 
-void BindStorageBuffer(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorBufferInfo info)
+void descriptor_allocator_set_storage_buffer(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorBufferInfo info)
 {
 	assert(allocator->currentSet != VK_NULL_HANDLE);
 
@@ -125,7 +134,7 @@ void BindStorageBuffer(descriptor_allocator_t* allocator, uint32_t binding, VkDe
 	};
 }
 
-void BindCombinedImageSampler(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorImageInfo info)
+void descriptor_allocator_set_combined_image_sampler(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorImageInfo info)
 {
 	assert(allocator->currentSet != VK_NULL_HANDLE);
 
@@ -144,7 +153,7 @@ void BindCombinedImageSampler(descriptor_allocator_t* allocator, uint32_t bindin
 	};
 }
 
-VkDescriptorSet FinishBindingDescriptors(descriptor_allocator_t* allocator)
+VkDescriptorSet descriptor_allocator_end(descriptor_allocator_t* allocator)
 {
 	vkUpdateDescriptorSets(allocator->vulkan->device, allocator->writeCount, allocator->writes, 0, NULL);
 

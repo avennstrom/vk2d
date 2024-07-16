@@ -1,6 +1,6 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
-#include "common.h"
+#include "gpu_types.h"
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec3 fragPos;
@@ -13,12 +13,7 @@ layout(location = 0) out vec4 outColor;
 
 layout(set = 0, binding = 0) uniform FrameUniformBlock { gpu_frame_uniforms_t g_frame; };
 layout(set = 0, binding = 1, std140) readonly buffer LightBuffer GPU_LIGHT_BUFFER_BLOCK g_scene;
-layout(set = 0, binding = 2) uniform sampler2D g_paintings;
-layout(set = 0, binding = 3) uniform sampler2DArray g_spotLightAtlas;
-
-vec3 samplePainting() {
-    return texture(g_paintings, fragUv).rgb;
-}
+layout(set = 0, binding = 2) uniform sampler2DArray g_spotLightAtlas;
 
 void calculatePointLight(inout vec3 color, vec3 albedo, gpu_point_light_t light)
 {
@@ -90,10 +85,6 @@ void calculateSpotLight(inout vec3 color, vec3 albedo, gpu_spot_light_t light, u
 
 void main() {
     vec3 albedo = fragColor;
-
-    if ((inFlags0 & (1 << 31)) != 0) {
-        albedo = samplePainting();
-    }
 
     vec3 color = 0.0.rrr;
 

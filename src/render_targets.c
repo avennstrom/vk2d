@@ -57,6 +57,8 @@ int AllocateDedicatedRenderTarget2D(
 	vkr = vkCreateImageView(vulkan->device, &imageViewInfo, NULL, &rt->view);
 	assert(vkr == VK_SUCCESS);
 
+	rt->state = IMAGE_STATE_UNDEFINED;
+
 	SetImageName(vulkan, rt->image, debugName);
 	SetImageViewName(vulkan, rt->view, debugName);
 	SetDeviceMemoryName(vulkan, rt->memory, debugName);
@@ -77,7 +79,7 @@ void destroy_dedicated_render_target(
 	rt->memory = NULL;
 }
 
-int CreateRenderTargets(
+int render_targets_create(
 	render_targets_t *rt,
 	vulkan_t *vulkan,
 	VkExtent2D resolution)
@@ -138,12 +140,13 @@ int CreateRenderTargets(
 	return 0;
 }
 
-void DestroyRenderTargets(
+void render_targets_destroy(
 	render_targets_t *rt, 
 	vulkan_t *vulkan)
 {
 	destroy_dedicated_render_target(&rt->sceneColor, vulkan);
 	destroy_dedicated_render_target(&rt->sceneDepth, vulkan);
+	destroy_dedicated_render_target(&rt->spotLightAtlas, vulkan);
 
 	rt->resolution = (VkExtent2D){0, 0};
 }

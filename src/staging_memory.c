@@ -24,6 +24,8 @@ void PushStagingBufferAllocation(
 {
 	VkResult r;
 
+	assert(allocator->count < MAX_STAGING_ALLOCATIONS);
+
 	const VkBufferCreateInfo bufferInfo = {
 		VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 		.size = size,
@@ -71,6 +73,7 @@ VkResult FinalizeStagingMemoryAllocator(
 	if (r != VK_SUCCESS) {
 		return r;
 	}
+	SetDeviceMemoryName(allocator->vulkan, allocation->memory, "Staging");
 
 	printf("Staging memory: %.2f MB\n", allocator->allocSize/1024.0f/1024.0f);
 

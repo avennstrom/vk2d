@@ -1,6 +1,6 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
-#include "common.h"
+#include "gpu_types.h"
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in uint inNormal;

@@ -2,7 +2,7 @@
 #define MAX_POINT_LIGHTS (64)
 #define MAX_SPOT_LIGHTS (32)
 
-#ifdef C
+#ifdef __STDC__
 typedef struct gpu_draw_t gpu_draw_t;
 typedef struct gpu_point_light_t gpu_point_light_t;
 typedef struct gpu_spot_light_t gpu_spot_light_t;
@@ -10,13 +10,26 @@ typedef struct gpu_frame_uniforms_t gpu_frame_uniforms_t;
 typedef struct gpu_light_buffer_t gpu_light_buffer_t;
 #endif
 
+#ifdef __HLSL__
+typedef float2 vec2;
+typedef float3 vec3;
+typedef float4 vec4;
+typedef float4x4 mat4;
+#endif
+
 struct gpu_draw_t
 {
-	mat4	transform;
-	uint	modelIndex;
+	uint	indexCount;
+	uint	instanceCount;
+	uint	firstIndex;
+	int		vertexOffset;
+
+	uint	firstInstance;
+	uint	vertexPositionOffset;
+	uint	vertexNormalOffset;
 	uint	_pad0;
-	uint	_pad1;
-	uint	_pad2;
+
+	mat4	transform;
 };
 
 struct gpu_point_light_t
@@ -51,14 +64,14 @@ struct gpu_frame_uniforms_t
 		mat4 spotLightMatrices[MAX_SPOT_LIGHTS]; \
 	}
 
-#ifdef C
+#ifdef __STDC__
 struct gpu_light_buffer_t GPU_LIGHT_BUFFER_BLOCK;
 #endif
 
-#ifdef C
-_Static_assert(sizeof(gpu_draw_t) == 80, "");
+#ifdef __STDC__
+_Static_assert(sizeof(gpu_draw_t) == 96, "");
 _Static_assert(sizeof(gpu_point_light_t) == 32, "");
 _Static_assert(sizeof(gpu_spot_light_t) == 32, "");
 _Static_assert(sizeof(gpu_frame_uniforms_t) == 80, "");
-_Static_assert(sizeof(gpu_light_buffer_t) == sizeof(gpu_point_light_t)*MAX_POINT_LIGHTS + sizeof(gpu_spot_light_t)*MAX_SPOT_LIGHTS + sizeof(mat4)*MAX_SPOT_LIGHTS, "");
+_Static_assert(sizeof(gpu_light_buffer_t) == MAX_POINT_LIGHTS*sizeof(gpu_point_light_t) + MAX_SPOT_LIGHTS*sizeof(gpu_spot_light_t) + MAX_SPOT_LIGHTS*sizeof(mat4), "");
 #endif

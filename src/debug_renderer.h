@@ -50,7 +50,9 @@ typedef struct debug_renderer_config
 	size_t	maxTriangles;
 } debug_renderer_config_t;
 
-int CreateDebugRenderer(debug_renderer_t* debugRenderer, vulkan_t* vulkan, const debug_renderer_config_t* config);
+int debug_renderer_create(debug_renderer_t* debugRenderer, vulkan_t* vulkan, const debug_renderer_config_t* config);
+void debug_renderer_destroy(debug_renderer_t* debugRenderer, vulkan_t* vulkan);
+
 int AllocateDebugRendererStagingMemory(staging_memory_allocator_t* allocator, debug_renderer_t* debugRenderer);
 void FlushDebugRenderer(
 	VkCommandBuffer cb,

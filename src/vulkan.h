@@ -2,6 +2,16 @@
 
 #include <vulkan/vulkan_core.h>
 
+typedef enum image_state
+{
+	IMAGE_STATE_UNDEFINED = 0,
+	IMAGE_STATE_VS_FS_READ,
+	IMAGE_STATE_CS_READ,
+	IMAGE_STATE_CS_WRITE,
+	IMAGE_STATE_COLOR_WRITE,
+	IMAGE_STATE_DEPTH_WRITE,
+} image_state_t;
+
 typedef struct vulkan_staging_memory_range {
 	void* ptr;
 	size_t size;
@@ -28,6 +38,7 @@ typedef struct vulkan
 } vulkan_t;
 
 int CreateVulkanContext(vulkan_t* vulkan, VkInstance instance, VkSurfaceKHR surface);
+void DestroyVulkanContext(vulkan_t* vulkan);
 const char* VkResultString(VkResult result);
 uint32_t FindMemoryType(vulkan_t* vulkan, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 VkBuffer CreateBuffer(VkDeviceMemory* memory, vulkan_t* vulkan, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties);

@@ -14,8 +14,8 @@ enum shader
 	SHADER_WORLD_FRAG,
 	SHADER_WORLD_SHADOW_VERT,
 	SHADER_WORLD_SHADOW_GEOM,
-	SHADER_PAINTER_VERT,
-	SHADER_PAINTER_FRAG,
+	SHADER_MODEL_VERT,
+	SHADER_MODEL_FRAG,
 	SHADER_COUNT,
 };
 
@@ -27,3 +27,4 @@ typedef struct shader_library
 extern shader_library_t g_shaders;
 
 int InitShaderLibrary(vulkan_t* vulkan);
+void DeinitShaderLibrary(vulkan_t* vulkan);

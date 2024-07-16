@@ -24,23 +24,38 @@ struct window
 	Pixmap bitmapNoData;
 };
 
-const char* getWindowSurfaceExtensionName()
+const char* window_get_surface_extension_name()
 {
 	return VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
 }
 
-window_t* createWindow(uint32_t width, uint32_t height)
+static int xlib_io_error_handler(Display*)
+{
+	//printf("X11 IO error lolol\n");
+	return 0;
+}
+
+static void xlib_io_error_exit_handler(Display*, void*)
+{
+	//printf("X11 IO error exit\n");
+}
+
+window_t* window_create(uint32_t width, uint32_t height)
 {
 	window_t* window = calloc(1, sizeof(window_t));
 	if (window == NULL) {
 		return NULL;
 	}
+
+	XSetIOErrorHandler(xlib_io_error_handler);
 	
 	window->display = XOpenDisplay(NULL);
 	if (window->display == NULL) {
 		fprintf(stderr, "Failed to establish X11 connection\n");
 		return NULL;
 	}
+
+	XSetIOErrorExitHandler(window->display, xlib_io_error_exit_handler, NULL);
 
 	window->window = XCreateSimpleWindow(window->display, RootWindow(window->display, 0), 0, 0, width, height, 0, 0, WhitePixel(window->display, 0));
 
@@ -60,15 +75,16 @@ window_t* createWindow(uint32_t width, uint32_t height)
 	return window;
 }
 
-void destroyWindow(window_t* window)
+void window_destroy(window_t* window)
 {
+	XSync(window->display, False);
 	XFreeCursor(window->display, window->invisibleCursor);
 	XFreePixmap(window->display, window->bitmapNoData);
 	XDestroyWindow(window->display, window->window);
 	XCloseDisplay(window->display);
 }
 
-VkSurfaceKHR createWindowSurface(VkInstance instance, window_t* window)
+VkSurfaceKHR window_create_surface(VkInstance instance, window_t* window)
 {
 	const VkXlibSurfaceCreateInfoKHR createInfo = {
 		VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
@@ -105,7 +121,7 @@ enum key_code MapKeyCode(XKeyEvent* event)
 	return KEY_UNKNOWN;
 }
 
-bool pollWindowEvent(window_event_t* event, window_t* window)
+bool window_poll(window_event_t* event, window_t* window)
 {
 	XEvent xevent;
 
@@ -118,6 +134,11 @@ bool pollWindowEvent(window_event_t* event, window_t* window)
 	*event = (window_event_t){WINDOW_EVENT_NULL};
 
 	switch (xevent.type) {
+		case DestroyNotify:
+			*event = (window_event_t){
+				WINDOW_EVENT_DESTROY,
+			};
+			break;
 		case KeyPress:
 			*event = (window_event_t){
 				WINDOW_EVENT_KEY_DOWN,
@@ -214,7 +235,7 @@ bool pollWindowEvent(window_event_t* event, window_t* window)
 	return true;
 }
 
-void setMouseLock(window_t* window, bool lock)
+void window_lock_mouse(window_t* window, bool lock)
 {
 	window->mouseLock = lock;
 

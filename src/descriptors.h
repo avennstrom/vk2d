@@ -26,13 +26,13 @@ typedef struct descriptor_allocator {
 	size_t					bufferCount;
 } descriptor_allocator_t;
 
-int CreateDescriptorSetCache(descriptor_set_cache_t* cache, VkDescriptorPool pool, size_t maxEntries);
-void UpdateDescriptorSetCache(descriptor_set_cache_t* cache, uint64_t frameId);
+int descriptor_set_cache_create(descriptor_set_cache_t* cache, VkDescriptorPool pool, size_t maxEntries);
+void descriptor_set_cache_destroy(descriptor_set_cache_t* cache, vulkan_t* vulkan);
+void descriptor_set_cache_update(descriptor_set_cache_t* cache, uint64_t frameId);
 
-int CreateDescriptorAllocator(descriptor_allocator_t* allocator, descriptor_set_cache_t* cache, vulkan_t* vulkan, size_t maxWrites);
-
-void StartBindingDescriptors(descriptor_allocator_t* allocator, VkDescriptorSetLayout layout, const char* debugName);
-void BindUniformBuffer(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorBufferInfo info);
-void BindStorageBuffer(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorBufferInfo info);
-void BindCombinedImageSampler(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorImageInfo info);
-VkDescriptorSet FinishBindingDescriptors(descriptor_allocator_t* allocator);
+int descriptor_allocator_create(descriptor_allocator_t* allocator, descriptor_set_cache_t* cache, vulkan_t* vulkan, size_t maxWrites);
+void descriptor_allocator_begin(descriptor_allocator_t* allocator, VkDescriptorSetLayout layout, const char* debugName);
+void descriptor_allocator_set_uniform_buffer(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorBufferInfo info);
+void descriptor_allocator_set_storage_buffer(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorBufferInfo info);
+void descriptor_allocator_set_combined_image_sampler(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorImageInfo info);
+VkDescriptorSet descriptor_allocator_end(descriptor_allocator_t* allocator);

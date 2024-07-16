@@ -1,6 +1,5 @@
 #include "game.h"
 #include "mat.h"
-#include "worldgen.h"
 #include "scene.h"
 #include "util.h"
 #include "rng.h"
@@ -26,49 +25,21 @@ typedef struct player {
 } player_t;
 
 enum {
-	GameState_AwaitWorld = 0,
-	GameState_PlayerSpawn,
-	GameState_EnemySpawn,
+	GameState_LoadScene = 0,
 	GameState_Play,
 };
 
-typedef struct enemy {
-	short3		pos;
-	short3		prev;
-	direction_t	dir;
-	float3		fpos;
-	float		t;
-} enemy_t;
-
 typedef struct game {
 	window_t*	window;
-	worldgen_t*	worldgen;
 	int			state;
 	bool		lockMouse;
-	uint8_t		connectivity[CHUNK_SIZE_X][CHUNK_SIZE_Y][CHUNK_SIZE_Z];
 
+	float		t;
 	player_t	player;
-	float3		playerSpawn;
-
-	enemy_t		enemies[MAX_ENEMIES];
-	size_t		enemyCount;
 
 	bool		keystate[256];
 	bool		buttonstate[2];
 } game_t;
-
-static enemy_t* SpawnEnemies(game_t* game, size_t count)
-{
-	const size_t rem = MAX_ENEMIES - game->enemyCount;
-	if (count > rem) {
-		return NULL;
-	}
-
-	enemy_t* e = game->enemies + game->enemyCount;
-	game->enemyCount += count;
-
-	return e;
-}
 
 static vec3 GetPlayerHead(const player_t* player)
 {
@@ -89,7 +60,7 @@ static vec3 GetPlayerLookNormal(const player_t* player)
 	return lookDir;
 }
 
-game_t* game_create(window_t* window, worldgen_t* worldgen)
+game_t* game_create(window_t* window)
 {
 	game_t* game = calloc(1, sizeof(game_t));
 	if (game == NULL) {
@@ -97,7 +68,6 @@ game_t* game_create(window_t* window, worldgen_t* worldgen)
 	}
 
 	game->window	= window;
-	game->worldgen	= worldgen;
 
 	game->player.flashlight = true;
 
@@ -124,7 +94,7 @@ int game_window_event(game_t* game, const window_event_t* event)
 		case WINDOW_EVENT_BUTTON_DOWN:
 			if (event->data.button.button == BUTTON_RIGHT) {
 				game->lockMouse = !game->lockMouse;
-				setMouseLock(game->window, game->lockMouse);
+				window_lock_mouse(game->window, game->lockMouse);
 			}
 			game->buttonstate[event->data.button.button] = true;
 			break;
@@ -207,132 +177,24 @@ static void TickPlayerMovement(game_t* game, float deltaTime)
 	}
 }
 
-static void StepEnemy(game_t* game, enemy_t* enemy)
-{
-	StepInDirection(&enemy->pos, enemy->dir);
-
-	const byte mask = game->connectivity[enemy->pos.x][enemy->pos.y][enemy->pos.z];
-	assert(mask != 0);
-
-	for (;;) {
-		if ((mask & (1 << enemy->dir)) == 0)
-		{
-			if (rand() & 1) {
-				enemy->dir = (enemy->dir + 1) % 4;
-			}
-			else {
-				enemy->dir = (enemy->dir + 3) % 4;
-			}
-			continue;
-		}
-		
-		break;
-	}
-}
-
-static void TickEnemies(game_t* game, float deltaTime)
-{
-	for (size_t i = 0; i < game->enemyCount; ++i) {
-		enemy_t* enemy = game->enemies + i;
-		enemy->t += deltaTime * 0.0005f;
-		if (enemy->t >= 1.0f) {
-			enemy->t -= floorf(enemy->t); // only step once if big delta
-			StepEnemy(game, enemy);
-		}
-		
-		short3 o = {0,0,0};
-		StepInDirection(&o, enemy->dir);
-
-		
-
-		enemy->fpos.x = (enemy->pos.x+enemy->t*o.x)*VOXEL_SIZE_X + VOXEL_SIZE_X*0.5f;
-		enemy->fpos.y = (enemy->pos.y+enemy->t*o.y)*VOXEL_SIZE_Y + VOXEL_SIZE_Y*0.5f;
-		enemy->fpos.z = (enemy->pos.z+enemy->t*o.z)*VOXEL_SIZE_Z + VOXEL_SIZE_Z*0.5f;
-	}
-}
-
-static void FindPlayerSpawn(short3* pos, game_t* game)
-{
-	uint rng = rand();
-
-	for (;;) {
-		const short3 candidate = { 
-			lcg_rand(&rng) % CHUNK_SIZE_X,
-			CHUNK_SIZE_Y - 1,
-			lcg_rand(&rng) % CHUNK_SIZE_Z,
-		};
-		const uint8_t mask = game->connectivity[candidate.x][candidate.y][candidate.z];
-		if (mask == 0) {
-			continue;
-		}
-		
-		*pos = candidate;
-		return;
-	}
-}
-
 void TickGame(game_t* game, float deltaTime)
 {
 	int r;
 
-	if (game->state == GameState_AwaitWorld) {
-		r = GetWorldConnectivity(game->connectivity, game->worldgen);
-		if (r != 0) {
-			//printf("Worldgen not done.\n");
-			return;
-		}
-
-		++game->state;
-	}
-
-	if (game->state == GameState_PlayerSpawn) {
-		short3 playerSpawn;
-		FindPlayerSpawn(&playerSpawn, game);
-
-		//playerSpawn = (ushort3){0,0,0};
-
-		printf("player spawn: %d, %d, %d\n", playerSpawn.x, playerSpawn.y, playerSpawn.z);
-
-		game->player.pos.x = playerSpawn.x*VOXEL_SIZE_X + VOXEL_SIZE_X*0.5f;
-		game->player.pos.y = playerSpawn.y*VOXEL_SIZE_Y;
-		game->player.pos.z = playerSpawn.z*VOXEL_SIZE_Z + VOXEL_SIZE_Z*0.5f;
-
-		game->playerSpawn = game->player.pos;
-		game->playerSpawn.y += 1.0f;
-
-		++game->state;
-	}
-
-	if (game->state == GameState_EnemySpawn)
-	{
-		enemy_t* enemies = SpawnEnemies(game, MAX_ENEMIES);
-		for (size_t i = 0; i < MAX_ENEMIES; ++i)
+	switch (game->state) {
+		case GameState_LoadScene:
 		{
-			enemy_t* enemy = enemies + i;
-			enemy->t = 0.0f;
-			FindPlayerSpawn(&enemy->pos, game);
-			const byte mask = game->connectivity[enemy->pos.x][enemy->pos.y][enemy->pos.z];
-			if (mask & DMASK_N) {
-				enemy->dir = Direction_North;
-			}
-			else if (mask & DMASK_E) {
-				enemy->dir = Direction_East;
-			}
-			else if (mask & DMASK_S) {
-				enemy->dir = Direction_South;
-			}
-			else if (mask & DMASK_W) {
-				enemy->dir = Direction_West;
-			}
+			++game->state;
+			break;
 		}
 
-		++game->state;
+		case GameState_Play:
+		{
+			TickPlayerMovement(game, deltaTime);
+		}
 	}
 
-	if (game->state == GameState_Play) {
-		TickEnemies(game, deltaTime);
-		TickPlayerMovement(game, deltaTime);
-	}
+	game->t += deltaTime;
 
 	return;
 }
@@ -366,6 +228,20 @@ int game_render(scb_t* scb, game_t* game)
 		};
 	}
 
+	{
+		mat4 m = mat_identity();
+		m = mat_translate(m, (vec3){2.0f, 0.0f, 0.0f});
+		m = mat_rotate_x(m, 0.001f * game->t);
+		m = mat_rotate_z(m, 0.001f * game->t * 0.6f);
+		m = mat_rotate_y(m, 0.001f * game->t * 0.4f);
+
+		scb_draw_model_t* models = scb_draw_models(scb, 1);
+		models[0] = (scb_draw_model_t){
+			.model = {(int)(game->t * 0.001f) % 2},
+			.transform = m,
+		};
+	}
+
 #if 0
 	{
 		mat4 m = mat_identity();
@@ -380,29 +256,6 @@ int game_render(scb_t* scb, game_t* game)
 		};
 	}
 #endif
-
-	//point_light = scb_add_point_lights(scb, game->enemyCount);
-	spot_light = scb_add_spot_lights(scb, game->enemyCount);
-	for (size_t i = 0; i < game->enemyCount; ++i) {
-		enemy_t* enemy = game->enemies + i;
-		// point_light[i] = (scb_point_light_t){
-		// 	.position = enemy->fpos,
-		// 	.radius = 8.0f,
-		// 	.color = {8.0f, 3.0f, 2.0f},
-		// };
-		short3 n = {};
-		StepInDirection(&n, enemy->dir);
-
-		mat4 m = mat_identity();
-		m = mat_translate(m, enemy->fpos);
-
-		spot_light[i] = (scb_spot_light_t){
-			.transform = m,
-			.range = 32.0f,
-			.radius = 90.0f,
-			.color = {5.0f, 0.2f, 0.0f},
-		};
-	}
 
 	return 0;
 }
