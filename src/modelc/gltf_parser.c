@@ -54,7 +54,18 @@ static uint32_t gltf_json_parser_eat_uint32(gltf_parser_t* parser)
 	char buf[64];
 	memcpy(buf, parser->json + tok.start, len);
 	buf[len] = '\0';
-	return (uint32_t)atoll(buf);
+	return strtoul(buf, NULL, 10);
+}
+
+static float gltf_json_parser_eat_float(gltf_parser_t* parser)
+{
+	const jsmntok_t tok = parser->tokens[parser->pos++];
+	assert(tok.type == JSMN_PRIMITIVE);
+	const int len = tok.end - tok.start;
+	char buf[64];
+	memcpy(buf, parser->json + tok.start, len);
+	buf[len] = '\0';
+	return strtof(buf, NULL);
 }
 
 static void gltf_json_parser_skip_key(gltf_parser_t* parser)
@@ -182,55 +193,50 @@ static void gltf_json_parser_parse_bufferViews(gltf_parser_t* parser)
 	}
 }
 
-static void gltf_json_parser_parse_accessor(gltf_parser_t* parser)
-{
-	gltf_accessor_t* accessor = &parser->gltf->accessors[parser->gltf->accessorCount++];
-	
-	const jsmntok_t tok = gltf_json_parser_eat_object(parser);
-	tokput(parser, "parse_accessor", tok);
-
-	for (int i = 0; i < tok.size; ++i)
-	{
-		if (gltf_json_parser_eat_key(parser, "bufferView"))
-		{
-			accessor->bufferView = gltf_json_parser_eat_uint32(parser);
-		}
-		else if (gltf_json_parser_eat_key(parser, "componentType"))
-		{
-			accessor->componentType = gltf_json_parser_eat_uint32(parser);
-		}
-		else if (gltf_json_parser_eat_key(parser, "count"))
-		{
-			accessor->count = gltf_json_parser_eat_uint32(parser);
-		}
-		else if (gltf_json_parser_eat_key(parser, "type"))
-		{
-			if (jsoneq(parser, "SCALAR"))		{ accessor->type = GLTF_ACCESSOR_TYPE_SCALAR; }
-			else if (jsoneq(parser, "VEC2"))	{ accessor->type = GLTF_ACCESSOR_TYPE_VEC2; }
-			else if (jsoneq(parser, "VEC3"))	{ accessor->type = GLTF_ACCESSOR_TYPE_VEC3; }
-			else if (jsoneq(parser, "VEC4"))	{ accessor->type = GLTF_ACCESSOR_TYPE_VEC4; }
-			else if (jsoneq(parser, "MAT2"))	{ accessor->type = GLTF_ACCESSOR_TYPE_MAT2; }
-			else if (jsoneq(parser, "MAT3"))	{ accessor->type = GLTF_ACCESSOR_TYPE_MAT3; }
-			else if (jsoneq(parser, "MAT4"))	{ accessor->type = GLTF_ACCESSOR_TYPE_MAT4; }
-			else
-			{
-				assert(0 && "Invalid accessor type");
-			}
-			++parser->pos;
-		}
-		else
-		{
-			gltf_json_parser_skip_field(parser);
-		}
-	}
-}
-
 static void gltf_json_parser_parse_accessors(gltf_parser_t* parser)
 {
 	const jsmntok_t arr = gltf_json_parser_eat_array(parser);
 	for (int i = 0; i < arr.size; ++i)
 	{
-		gltf_json_parser_parse_accessor(parser);
+		gltf_accessor_t* accessor = &parser->gltf->accessors[parser->gltf->accessorCount++];
+	
+		const jsmntok_t tok = gltf_json_parser_eat_object(parser);
+		tokput(parser, "parse_accessor", tok);
+
+		for (int accessor_i = 0; accessor_i < tok.size; ++accessor_i)
+		{
+			if (gltf_json_parser_eat_key(parser, "bufferView"))
+			{
+				accessor->bufferView = gltf_json_parser_eat_uint32(parser);
+			}
+			else if (gltf_json_parser_eat_key(parser, "componentType"))
+			{
+				accessor->componentType = gltf_json_parser_eat_uint32(parser);
+			}
+			else if (gltf_json_parser_eat_key(parser, "count"))
+			{
+				accessor->count = gltf_json_parser_eat_uint32(parser);
+			}
+			else if (gltf_json_parser_eat_key(parser, "type"))
+			{
+				if (jsoneq(parser, "SCALAR"))		{ accessor->type = GLTF_ACCESSOR_TYPE_SCALAR; }
+				else if (jsoneq(parser, "VEC2"))	{ accessor->type = GLTF_ACCESSOR_TYPE_VEC2; }
+				else if (jsoneq(parser, "VEC3"))	{ accessor->type = GLTF_ACCESSOR_TYPE_VEC3; }
+				else if (jsoneq(parser, "VEC4"))	{ accessor->type = GLTF_ACCESSOR_TYPE_VEC4; }
+				else if (jsoneq(parser, "MAT2"))	{ accessor->type = GLTF_ACCESSOR_TYPE_MAT2; }
+				else if (jsoneq(parser, "MAT3"))	{ accessor->type = GLTF_ACCESSOR_TYPE_MAT3; }
+				else if (jsoneq(parser, "MAT4"))	{ accessor->type = GLTF_ACCESSOR_TYPE_MAT4; }
+				else
+				{
+					assert(0 && "Invalid accessor type");
+				}
+				++parser->pos;
+			}
+			else
+			{
+				gltf_json_parser_skip_field(parser);
+			}
+		}
 	}
 }
 
@@ -262,6 +268,10 @@ static void gltf_json_parser_parse_primitive(gltf_parser_t* parser, gltf_mesh_t*
 				{
 					primitive->attributes[GLTF_ATTRIBUTE_NORMAL] = gltf_json_parser_eat_uint32(parser);
 				}
+				else if (gltf_json_parser_eat_key(parser, "COLOR_0"))
+				{
+					primitive->attributes[GLTF_ATTRIBUTE_COLOR] = gltf_json_parser_eat_uint32(parser);
+				}
 				else
 				{
 					gltf_json_parser_skip_field(parser);
@@ -284,36 +294,93 @@ static void gltf_json_parser_parse_primitives(gltf_parser_t* parser, gltf_mesh_t
 	}
 }
 
-static void gltf_json_parser_parse_mesh(gltf_parser_t* parser)
+static void gltf_json_parser_parse_meshes(gltf_parser_t* parser)
 {
-	gltf_mesh_t* mesh = &parser->gltf->meshes[parser->gltf->meshCount++];
+	const jsmntok_t arr = gltf_json_parser_eat_array(parser);
+	for (int i = 0; i < arr.size; ++i)
+	{
+		gltf_mesh_t* mesh = &parser->gltf->meshes[parser->gltf->meshCount++];
+	
+		const jsmntok_t tok = gltf_json_parser_eat_object(parser);
+		tokput(parser, "parse_mesh", tok);
+
+		for (int mesh_i = 0; mesh_i < tok.size; ++mesh_i)
+		{
+			if (gltf_json_parser_eat_key(parser, "name"))
+			{
+				gltf_json_parser_eat_string(mesh->name, parser);
+			}
+			else if (gltf_json_parser_eat_key(parser, "primitives"))
+			{
+				gltf_json_parser_parse_primitives(parser, mesh);
+			}
+			else
+			{
+				gltf_json_parser_skip_field(parser);
+			}
+		}
+	}
+}
+
+static void gltf_json_parser_parse_node(gltf_parser_t* parser)
+{
+	gltf_node_t* node = &parser->gltf->nodes[parser->gltf->nodeCount++];
 	
 	const jsmntok_t tok = gltf_json_parser_eat_object(parser);
-	tokput(parser, "parse_mesh", tok);
+	tokput(parser, "parse_node", tok);
 
 	for (int i = 0; i < tok.size; ++i)
 	{
 		if (gltf_json_parser_eat_key(parser, "name"))
 		{
-			gltf_json_parser_eat_string(mesh->name, parser);
+			gltf_json_parser_eat_string(node->name, parser);
 		}
-		else if (gltf_json_parser_eat_key(parser, "primitives"))
+		else if (gltf_json_parser_eat_key(parser, "children"))
 		{
-			gltf_json_parser_parse_primitives(parser, mesh);
+			const jsmntok_t arr = gltf_json_parser_eat_array(parser);
+			for (int j = 0; j < arr.size; ++j)
+			{
+				assert(node->childCount < GLTF_PARSER_NODE_MAX_CHILDREN);
+				node->children[node->childCount++] = gltf_json_parser_eat_uint32(parser);
+			}
+		}
+		else if (gltf_json_parser_eat_key(parser, "rotation"))
+		{
+			const jsmntok_t arr = gltf_json_parser_eat_array(parser);
+			assert(arr.size == 4);
+			node->rotation[0] = gltf_json_parser_eat_float(parser);
+			node->rotation[1] = gltf_json_parser_eat_float(parser);
+			node->rotation[2] = gltf_json_parser_eat_float(parser);
+			node->rotation[3] = gltf_json_parser_eat_float(parser);
+		}
+		else if (gltf_json_parser_eat_key(parser, "translation"))
+		{
+			const jsmntok_t arr = gltf_json_parser_eat_array(parser);
+			assert(arr.size == 3);
+			node->translation[0] = gltf_json_parser_eat_float(parser);
+			node->translation[1] = gltf_json_parser_eat_float(parser);
+			node->translation[2] = gltf_json_parser_eat_float(parser);
+		}
+		else if (gltf_json_parser_eat_key(parser, "mesh"))
+		{
+			node->type = GLTF_NODE_TYPE_MESH;
+			node->mesh = gltf_json_parser_eat_uint32(parser);
 		}
 		else
 		{
 			gltf_json_parser_skip_field(parser);
 		}
 	}
+
+	assert(node->type != GLTF_NODE_TYPE_UNDEFINED);
 }
 
-static void gltf_json_parser_parse_meshes(gltf_parser_t* parser)
+static void gltf_json_parser_parse_nodes(gltf_parser_t* parser)
 {
 	const jsmntok_t arr = gltf_json_parser_eat_array(parser);
 	for (int i = 0; i < arr.size; ++i)
 	{
-		gltf_json_parser_parse_mesh(parser);
+		gltf_json_parser_parse_node(parser);
 	}
 }
 
@@ -347,6 +414,10 @@ void gltf_parse(gltf_t* gltf, const char* json, size_t len)
 		{
 			gltf_json_parser_parse_meshes(&parser);
 		}
+		else if (gltf_json_parser_eat_key(&parser, "nodes"))
+		{
+			gltf_json_parser_parse_nodes(&parser);
+		}
 		else
 		{
 			gltf_json_parser_skip_field(&parser);
@@ -356,6 +427,24 @@ void gltf_parse(gltf_t* gltf, const char* json, size_t len)
 
 void gltf_dump(gltf_t* gltf)
 {
+	for (int i = 0; i < gltf->nodeCount; ++i)
+	{
+		const gltf_node_t* node = &gltf->nodes[i];
+		printf("nodes[%d].name: %s\n", i, node->name);
+		if (node->type == GLTF_NODE_TYPE_MESH)
+		{
+			printf("nodes[%d].type: %s\n", i, "MESH");
+			printf("nodes[%d].mesh: %u\n", i, node->mesh);
+		}
+		printf("nodes[%d].rotation: {%f, %f, %f, %f}\n", i, node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]);
+		printf("nodes[%d].translation: {%f, %f, %f}\n", i, node->translation[0], node->translation[1], node->translation[2]);
+		for (int j = 0; j < node->childCount; ++j)
+		{
+			const uint32_t child = node->children[j];
+			printf("nodes[%d].children[%d]: %u\n", i, j, child);
+		}
+	}
+
 	for (int i = 0; i < gltf->meshCount; ++i)
 	{
 		const gltf_mesh_t* mesh = &gltf->meshes[i];
@@ -365,6 +454,7 @@ void gltf_dump(gltf_t* gltf)
 			const gltf_primitive_t* prim = &mesh->primitives[j];
 			printf("meshes[%d].primitives[%d].attributes[POSITION]: %u\n", i, j, prim->attributes[GLTF_ATTRIBUTE_POSITION]);
 			printf("meshes[%d].primitives[%d].attributes[NORMAL]: %u\n", i, j, prim->attributes[GLTF_ATTRIBUTE_NORMAL]);
+			printf("meshes[%d].primitives[%d].attributes[COLOR]: %u\n", i, j, prim->attributes[GLTF_ATTRIBUTE_COLOR]);
 			printf("meshes[%d].primitives[%d].indices: %u\n", i, j, prim->indices);
 		}
 	}

@@ -17,6 +17,10 @@
 		"jsmn.h": "c",
 		"stdio.h": "c",
 		"time.h": "c",
-		"gpu_types.h": "c"
+		"gpu_types.h": "c",
+		"types.h": "c",
+		"typeindex": "c",
+		"typeinfo": "c",
+		"stdint.h": "c"
 	}
 }

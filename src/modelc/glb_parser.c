@@ -4,9 +4,12 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#define GLB_CHUNK_TYPE_JSON			0x4E4F534Au
+#define GLB_CHUNK_TYPE_BIN			0x004E4942u
+
 int glb_parse(glb_t* glb, const char* filename)
 {
-	*glb = (glb_t){};
+	*glb = (glb_t){0};
 
 	FILE* f = fopen(filename, "rb");
 	if (f == NULL)
@@ -42,7 +45,7 @@ int glb_parse(glb_t* glb, const char* filename)
 		r = fread(json, chunk_header.chunkLength, 1, f);
 		assert(r == 1);
 
-		//printf("%.*s", (int)chunk_header.chunkLength, json);
+		printf("%.*s", (int)chunk_header.chunkLength, json);
 		gltf_parse(&glb->gltf, json, chunk_header.chunkLength);
 	}
 	
@@ -59,6 +62,8 @@ int glb_parse(glb_t* glb, const char* filename)
 		r = fread(glb->buffer.data, glb->buffer.len, 1, f);
 		assert(r == 1);
 	}
+	
+	fclose(f);
 
 	return 0;
 }

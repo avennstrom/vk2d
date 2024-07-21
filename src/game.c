@@ -69,7 +69,10 @@ game_t* game_create(window_t* window)
 
 	game->window	= window;
 
-	game->player.flashlight = true;
+	//game->player.flashlight = true;
+
+	game->player.pos.z = 4.0f;
+	game->player.pitch = 0.3f;
 
 	return game;
 }

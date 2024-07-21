@@ -6,9 +6,6 @@
 #include <stddef.h>
 
 // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#glb-file-format-specification
-#define GLB_CHUNK_TYPE_JSON			0x4E4F534Au
-#define GLB_CHUNK_TYPE_BIN			0x004E4942u
-
 typedef struct glb_header
 {
 	uint32_t magic;

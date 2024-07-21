@@ -444,9 +444,6 @@ void scene_draw(
 			{
 				scb_spot_light_t *spotLight = spotLights + i;
 
-				//mat4 matrix = mat_identity();
-				//matrix = mat_translate(matrix, spotLight->position);
-
 				mat4 viewMatrix = mat_invert(spotLight->transform);
 				mat4 projectionMatrix = mat_perspective(spotLight->radius, 1.0f, 0.1f, spotLight->range);
 				mat4 viewProjectionMatrix = mat_mul(viewMatrix, projectionMatrix);
@@ -485,7 +482,6 @@ void scene_draw(
 	PushStagingMemoryFlush(rc->stagingMemory, frame->lights, sizeof(gpu_light_buffer_t));
 	PushStagingMemoryFlush(rc->stagingMemory, frame->spotShadowDraws, MAX_SPOT_LIGHTS * sizeof(VkDrawIndirectCommand));
 	PushStagingMemoryFlush(rc->stagingMemory, frame->draws, gpuDrawCount * sizeof(gpu_draw_t));
-	//PushStagingMemoryFlush(rc->staging_memory, frame->drawCommands, gpuDrawCount * sizeof(VkDrawIndexedIndirectCommand));
 
 	const VkDescriptorBufferInfo frameUniformBuffer = {
 		.buffer = frame->uniformBuffer,
@@ -500,12 +496,6 @@ void scene_draw(
 		.imageView = rc->rt->spotLightAtlas.view,
 		.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 	};
-
-	// VkDescriptorSet worldDescriptorSet = CreateWorldDescriptorSet(
-	// 	rc->dsalloc,
-	// 	frameUniformBuffer,
-	// 	lightBuffer,
-	// 	spotLightAtlas);
 
 	{
 		const VkImageMemoryBarrier imageBarriers[] = {
@@ -532,6 +522,7 @@ void scene_draw(
 							 0, NULL,
 							 countof(imageBarriers), imageBarriers);
 	}
+#if 0
 	{
 		const VkRenderingAttachmentInfo depthAttachment = {
 			VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -568,6 +559,7 @@ void scene_draw(
 
 		vkCmdEndRendering(cb);
 	}
+#endif
 	{
 		const VkImageMemoryBarrier imageBarriers[] = {
 			{

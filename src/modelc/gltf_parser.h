@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#accessor-data-types
 #define GLTF_ACCESSOR_COMPONENT_TYPE_INT8	5120
@@ -32,8 +33,34 @@ enum
 {
 	GLTF_ATTRIBUTE_POSITION,
 	GLTF_ATTRIBUTE_NORMAL,
+	GLTF_ATTRIBUTE_COLOR,
 	GLTF_ATTRIBUTE_COUNT,
 };
+
+#define GLTF_PARSER_MAX_NODES			64
+#define GLTF_PARSER_MAX_MESHES			64
+#define GLTF_PARSER_MAX_BUFFER_VIEWS	64
+#define GLTF_PARSER_MAX_ACCESSORS		64
+#define GLTF_PARSER_NODE_MAX_CHILDREN	64
+#define GLTF_PARSER_MESH_MAX_PRIMITIVES	64
+#define GLTF_PARSER_MAX_NAME_LENGTH		128
+
+typedef enum gltf_node_type
+{
+	GLTF_NODE_TYPE_UNDEFINED,
+	GLTF_NODE_TYPE_MESH,
+} gltf_node_type_t;
+
+typedef struct gltf_node
+{
+	char				name[GLTF_PARSER_MAX_NAME_LENGTH];
+	gltf_node_type_t	type;
+	uint32_t			mesh;
+	float				rotation[4];
+	float				translation[3];
+	uint32_t			children[GLTF_PARSER_NODE_MAX_CHILDREN];
+	uint32_t			childCount;
+} gltf_node_t;
 
 typedef struct gltf_primitive
 {
@@ -43,9 +70,9 @@ typedef struct gltf_primitive
 
 typedef struct gltf_mesh
 {
-	char				name[128];
+	char				name[GLTF_PARSER_MAX_NAME_LENGTH];
 	uint32_t			primitiveCount;
-	gltf_primitive_t	primitives[64];
+	gltf_primitive_t	primitives[GLTF_PARSER_MESH_MAX_PRIMITIVES];
 } gltf_mesh_t;
 
 typedef struct gltf_accessor
@@ -54,6 +81,7 @@ typedef struct gltf_accessor
 	uint32_t				componentType;
 	uint32_t				count;
 	gltf_accessor_type_t	type;
+	bool					normalized;
 } gltf_accessor_t;
 
 typedef struct gltf_buffer_view
@@ -66,13 +94,14 @@ typedef struct gltf_buffer_view
 
 typedef struct gltf
 {
+	uint32_t			nodeCount;
 	uint32_t			meshCount;
 	uint32_t			bufferViewCount;
 	uint32_t			accessorCount;
-
-	gltf_mesh_t			meshes[64];
-	gltf_buffer_view_t	bufferViews[64];
-	gltf_accessor_t		accessors[64];
+	gltf_node_t			nodes[GLTF_PARSER_MAX_NODES];
+	gltf_mesh_t			meshes[GLTF_PARSER_MAX_MESHES];
+	gltf_buffer_view_t	bufferViews[GLTF_PARSER_MAX_BUFFER_VIEWS];
+	gltf_accessor_t		accessors[GLTF_PARSER_MAX_ACCESSORS];
 } gltf_t;
 
 void gltf_parse(gltf_t* gltf, const char* json, size_t len);
