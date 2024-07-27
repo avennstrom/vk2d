@@ -392,6 +392,7 @@ void gltf_parse(gltf_t* gltf, const char* json, size_t len)
 
 	jsmntok_t tokens[16 * 1024];
 	const int tokenCount = jsmn_parse(&jsmn, json, len, tokens, 16 * 1024);
+	assert(tokenCount > 0);
 
 	gltf_parser_t parser = {
 		.json	= json,

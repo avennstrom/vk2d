@@ -14,16 +14,16 @@ SHADER_OBJ := ${SHADER_OBJ} obj/model.vs.spo obj/model.fs.spo
 #.PHONY: shaderc
 .SECONDARY: $(SHADER_SPV)
 
-default: ${TARGET_NAME} modelc
+default: ${TARGET_NAME} converter
 
 ${TARGET_NAME}: ${C_OBJ} ${SHADER_OBJ} | $(SHADER_DIS) ${H_FILES}
-	$(CC) -std=c11 -L${VULKAN_SDK}/lib -g -o $@ $^ -lvulkan -lX11 -lm
+	$(CC) -Werror -std=c11 -L${VULKAN_SDK}/lib -g -o $@ $^ -lvulkan -lX11 -lm
 
 obj:
 	@mkdir -p obj
 
 obj/%.o: src/%.c | obj
-	$(CC) -std=c11 -I${VULKAN_SDK}/include -g -c -o $@ $^
+	$(CC) -Werror -std=c11 -I${VULKAN_SDK}/include -g -c -o $@ $^
 
 obj/%.spv: shaders/%
 	glslangValidator -V -o $@ $^
@@ -37,12 +37,14 @@ obj/%.spo: obj/%.spv
 shaderc:
 	./shaderc.py
 
-modelc: src/modelc/main.c src/modelc/gltf_parser.c src/modelc/glb_parser.c
-	$(CC) -std=c11 -g -o $@ $^
+converter: src/converter/main.c src/converter/gltf_parser.c src/converter/glb_parser.c
+	$(CC) -Wall -Wshadow -Werror -std=c11 -g -o $@ $^
 
 clean:
 	rm -f ${TARGET_NAME}
+	rm -f converter
 	rm -rf obj
+	rm -rf dat
 
 debug:
 	@echo $(SHADER_OBJ)

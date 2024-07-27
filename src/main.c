@@ -15,6 +15,8 @@
 #include "delta_time.h"
 #include "tests.h"
 #include "model_loader.h"
+#include "game_resource.h"
+#include "content.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -288,9 +290,6 @@ int main(int argc, char **argv)
 			return 1;
 		}
 	}
-	
-	model_loader_t* modelLoader = model_loader_create(&vulkan);
-	assert(modelLoader != NULL);
 
 	const uint32_t maxDescriptorSets = 1024;
 
@@ -320,8 +319,15 @@ int main(int argc, char **argv)
 
 	uint64_t frameId = 0;
 
-	scene_t *scene = scene_create(&vulkan);
+	game_resource_t gameResource = {};
+	game_resource_open(&gameResource);
+
+	content_t content = {};
+	content_open(&content);
+
+	scene_t* scene = scene_create(&vulkan);
 	composite_t* composite = composite_create(&vulkan);
+	model_loader_t* modelLoader = model_loader_create(&vulkan, &gameResource, &content);
 
 	staging_memory_allocator_t staging_allocator;
 	ResetStagingMemoryAllocator(&staging_allocator, &vulkan);
@@ -332,7 +338,7 @@ int main(int argc, char **argv)
 	staging_memory_allocation_t stagingAllocation;
 	FinalizeStagingMemoryAllocator(&stagingAllocation, &staging_allocator);
 
-	game_t *game = game_create(window, modelLoader);
+	game_t* game = game_create(window, modelLoader);
 
 	delta_timer_t deltaTimer;
 	delta_timer_reset(&deltaTimer);
@@ -637,6 +643,10 @@ int main(int argc, char **argv)
 	debug_renderer_destroy(&debugRenderer, &vulkan);
 	scene_destroy(scene);
 	composite_destroy(composite, &vulkan);
+
+	game_resource_close(&gameResource);
+	content_close(&content);
+
 	descriptor_set_cache_destroy(&dscache, &vulkan);
 	vkDestroyDescriptorPool(vulkan.device, descriptorPool, NULL);
 

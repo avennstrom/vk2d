@@ -19,7 +19,6 @@ typedef struct model model_t;
 
 typedef enum model_state
 {
-	MODEL_STATE_READ_HEADERS = 0,
 	MODEL_STATE_ALLOCATE_STAGING_MEMORY,
 	MODEL_STATE_READ_DATA,
 	MODEL_STATE_UPLOAD_DATA,
@@ -30,7 +29,7 @@ struct model
 {
 	model_state_t					state;
 	model_t*						next;
-	FILE*							file;
+	size_t							contentOffset;
 	FILEFORMAT_model_header_t		header;
 	FILEFORMAT_model_part_header_t	partHeaders[MODEL_LOADER_MAX_PARTS_PER_MODEL];
 	model_hierarchy_node_t			hierarchy[MODEL_LOADER_MAX_HIERARCHY_SIZE];
@@ -42,6 +41,7 @@ struct model
 struct model_loader
 {
 	vulkan_t*			vulkan;
+	content_t*			content;
 
 	VkBuffer			stagingBuffer;
 	uint8_t*			stagingMemory;
@@ -57,9 +57,9 @@ struct model_loader
 	VkBuffer			modelBuffer;
 };
 
-static void model_loader_start_load_models(model_loader_t* modelLoader);
+static void model_loader_start_load_models(model_loader_t* modelLoader, const game_resource_t* gameResource);
 
-model_loader_t* model_loader_create(vulkan_t* vulkan)
+model_loader_t* model_loader_create(vulkan_t* vulkan, const game_resource_t* gameResource, content_t* content)
 {
 	int r;
 	
@@ -69,7 +69,8 @@ model_loader_t* model_loader_create(vulkan_t* vulkan)
 		return NULL;
 	}
 
-	modelLoader->vulkan = vulkan;
+	modelLoader->vulkan		= vulkan;
+	modelLoader->content	= content;
 
 	r = offset_allocator_create(&modelLoader->stagingAllocator, MODEL_LOADER_STAGING_BUFFER_SIZE, MODEL_LOADER_MAX_MODELS);
 	assert(r == 0);
@@ -82,7 +83,7 @@ model_loader_t* model_loader_create(vulkan_t* vulkan)
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	assert(modelLoader->storageBuffer != NULL);
 
-	model_loader_start_load_models(modelLoader);
+	model_loader_start_load_models(modelLoader, gameResource);
 
 	return modelLoader;
 }
@@ -120,40 +121,6 @@ void model_loader_update(VkCommandBuffer cb, model_loader_t* modelLoader, const 
 
 		switch (model->state)
 		{
-			case MODEL_STATE_READ_HEADERS:
-			{
-				int nread;
-
-				uint32_t fileVersion;
-				nread = fread(&fileVersion, sizeof(uint32_t), 1, model->file);
-				assert(nread == 1);
-				assert(fileVersion == 2);
-				
-				nread = fread(&model->header, sizeof(model->header), 1, model->file);
-				assert(nread == 1);
-
-				nread = fread(model->partHeaders, sizeof(model->partHeaders[0]), model->header.partCount, model->file);
-				assert(nread == model->header.partCount);
-
-				for (uint i = 0; i < model->header.partCount; ++i)
-				{
-					mat4 m = mat_identity();
-					m = mat_rotate(m, model->partHeaders[i].rotation);
-					m = mat_translate(m, model->partHeaders[i].translation);
-
-					model->hierarchy[i].localTransform	= m;
-					model->hierarchy[i].parentIndex		= model->partHeaders[i].parentIndex;
-				}
-
-				model->storageAllocation = modelLoader->storageBufferAllocator;
-				modelLoader->storageBufferAllocator += model->header.dataSize;
-
-				assert(model->storageAllocation % 4 == 0);
-
-				model->state = MODEL_STATE_ALLOCATE_STAGING_MEMORY;
-				break;
-			}
-
 			case MODEL_STATE_ALLOCATE_STAGING_MEMORY:
 			{
 				if (!offset_allocator_alloc(&model->stagingAllocation, &modelLoader->stagingAllocator, model->header.dataSize))
@@ -168,8 +135,9 @@ void model_loader_update(VkCommandBuffer cb, model_loader_t* modelLoader, const 
 			case MODEL_STATE_READ_DATA:
 			{
 				uint8_t* data = modelLoader->stagingMemory + model->stagingAllocation.offset;
-				const int nread = fread(data, 1, model->header.dataSize, model->file);
-				assert(nread == model->header.dataSize); // :todo:
+				//const int nread = fread(data, 1, model->header.dataSize, model->file);
+				//assert(nread == model->header.dataSize); // :todo:
+				content_read(data, modelLoader->content, model->header.contentOffset, model->header.dataSize);
 				
 				model->state = MODEL_STATE_UPLOAD_DATA;
 				break;
@@ -213,22 +181,42 @@ void model_loader_update(VkCommandBuffer cb, model_loader_t* modelLoader, const 
 	}
 }
 
-static void model_loader_start_load_model(model_loader_t* modelLoader, model_t* model, const char* filename)
+static void model_loader_start_load_models(model_loader_t* modelLoader, const game_resource_t* gameResource)
 {
-	model->file	= fopen(filename, "rb");
-	if (model->file == NULL)
+	assert(gameResource->modelCount < MODEL_LOADER_MAX_MODELS);
+
+	for (size_t i = 0; i < gameResource->modelCount; ++i)
 	{
-		fprintf(stderr, "Failed to open model '%s'\n", filename);
-		return;
+		model_t* model = &modelLoader->models[i];
+
+		const FILEFORMAT_game_resource_model_entry_t* modelEntry = &gameResource->models[i];
+		const uint64_t headerOffset = modelEntry->headerOffset;
+		const FILEFORMAT_model_header_t* modelHeader = (FILEFORMAT_model_header_t*)(gameResource->mem + headerOffset);
+		const FILEFORMAT_model_part_header_t* partHeaders = (FILEFORMAT_model_part_header_t*)(modelHeader + 1);
+	
+		memcpy(&model->header, modelHeader, sizeof(model->header));
+		memcpy(model->partHeaders, partHeaders, sizeof(FILEFORMAT_model_part_header_t) * model->header.partCount);
+
+		for (uint i = 0; i < model->header.partCount; ++i)
+		{
+			mat4 m = mat_identity();
+			m = mat_rotate(m, model->partHeaders[i].rotation);
+			m = mat_translate(m, model->partHeaders[i].translation);
+
+			model->hierarchy[i].localTransform	= m;
+			model->hierarchy[i].parentIndex		= model->partHeaders[i].parentIndex;
+		}
+
+		model->storageAllocation = modelLoader->storageBufferAllocator;
+		modelLoader->storageBufferAllocator += model->header.dataSize;
+
+		assert(model->storageAllocation % 4 == 0); // for storage buffer access
+
+		model->next = modelLoader->loadingModels;
+		modelLoader->loadingModels = model;
 	}
 
-	model->next = modelLoader->loadingModels;
-	modelLoader->loadingModels = model;
-}
-
-static void model_loader_start_load_models(model_loader_t* modelLoader)
-{
-	model_loader_start_load_model(modelLoader, &modelLoader->models[0], "dat/tank.model");
+	//model_loader_start_load_model(modelLoader, &modelLoader->models[0], "dat/tank.model");
 	//model_loader_start_load_model(modelLoader, &modelLoader->models[0], "dat/colortest.model");
 	//model_loader_start_load_model(modelLoader, &modelLoader->models[1], "dat/cube.model");
 	//model_loader_start_load_model(modelLoader, &modelLoader->models[2], "dat/sphere.model");

@@ -17,6 +17,22 @@
 
 #define MAX_ENEMIES			4
 
+#define MODEL_TANK ((model_handle_t){0})
+#define MODEL_COLORTEST ((model_handle_t){1})
+
+typedef struct model_tank
+{
+	uint32_t node_body;
+	uint32_t node_turret;
+	uint32_t node_pipe;
+} model_tank_t;
+
+static const model_tank_t g_model_tank = {
+	.node_body = 0,
+	.node_turret = 1,
+	.node_pipe = 2,
+};
+
 typedef struct player {
 	byte	flashlight : 1;
 	vec3	pos;
@@ -234,20 +250,20 @@ int game_render(scb_t* scb, game_t* game)
 	}
 
 	{
-		const model_handle_t tankModel = {0};
-
 		mat4 m[16];
+
 		for (int i = 0; i < countof(m); ++i)
 		{
 			m[i] = mat_identity();
 		}
 
-		// Tank
-		m[0] = mat_translate(m[0], (vec3){sin(0.001f * game->t) * 2.0f, 0.0f, 0.0f});
-		// Turret
-		m[1] = mat_rotate_y(m[1], 0.002f * game->t * 0.4f);
-		// Pipe
-		m[2] = mat_rotate_z(m[2], sin(0.01f * game->t) * 0.2f);
+		mat4* m_body = &m[g_model_tank.node_body];
+		mat4* m_turret = &m[g_model_tank.node_turret];
+		mat4* m_pipe = &m[g_model_tank.node_pipe];
+
+		*m_body = mat_translate(*m_body, (vec3){sin(0.001f * game->t) * 2.0f, 0.0f, 0.0f});
+		*m_turret = mat_rotate_y(*m_turret, 0.002f * game->t * 0.4f);
+		*m_pipe = mat_rotate_z(*m_pipe, sin(0.01f * game->t) * 0.2f);
 
 		// m = mat_translate(m, (vec3){2.0f, 0.0f, 0.0f});
 		// m = mat_rotate_x(m, 0.001f * game->t);
@@ -255,20 +271,42 @@ int game_render(scb_t* scb, game_t* game)
 		// m = mat_rotate_y(m, 0.001f * game->t * 0.4f);
 
 		model_hierarchy_t hierarchy;
-		model_loader_get_model_hierarchy(&hierarchy, game->modelLoader, tankModel);
+		model_loader_get_model_hierarchy(&hierarchy, game->modelLoader, MODEL_TANK);
 		
 		mat4 transforms[16];
 		model_hierarchy_resolve(transforms, m, &hierarchy);
 
-		scb_draw_model_t* models = scb_draw_models(scb, 1);
+		scb_draw_model_t* models = scb_draw_models(scb, 2);
+
 		models[0] = (scb_draw_model_t){
-			//.model = {(int)(game->t * 0.001f) % 2},
-			.model = tankModel,
+			.model = MODEL_TANK,
 			.transform[0] = transforms[0],
 			.transform[1] = transforms[1],
 			.transform[2] = transforms[2],
 			.transform[3] = transforms[3],
 			.transform[4] = transforms[4],
+			.transform[5] = transforms[5],
+		};
+
+		for (int i = 0; i < countof(m); ++i)
+		{
+			m[i] = mat_identity();
+		}
+
+
+		m[0] = mat_translate(m[0], (vec3){ 10.0f, 0.0f, 0.0f });
+
+		model_loader_get_model_hierarchy(&hierarchy, game->modelLoader, MODEL_COLORTEST);
+		model_hierarchy_resolve(transforms, m, &hierarchy);
+
+		models[1] = (scb_draw_model_t){
+			.model = MODEL_COLORTEST,
+			.transform[0] = transforms[0],
+			.transform[1] = transforms[1],
+			.transform[2] = transforms[2],
+			.transform[3] = transforms[3],
+			.transform[4] = transforms[4],
+			.transform[5] = transforms[5],
 		};
 	}
 

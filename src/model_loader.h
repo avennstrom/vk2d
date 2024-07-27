@@ -3,6 +3,8 @@
 #include "staging_memory.h"
 #include "render_context.h"
 #include "types.h"
+#include "game_resource.h"
+#include "content.h"
 
 #include <stdbool.h>
 
@@ -12,7 +14,7 @@ typedef struct model_handle {
 	uint32_t index;
 } model_handle_t;
 
-model_loader_t* model_loader_create(vulkan_t* vulkan);
+model_loader_t* model_loader_create(vulkan_t* vulkan, const game_resource_t* gameResource, content_t* content);
 void model_loader_destroy(model_loader_t* modelLoader);
 
 void model_loader_alloc_staging_mem(staging_memory_allocator_t* allocator, model_loader_t* modelLoader);
