@@ -27,7 +27,7 @@ struct gpu_draw_t
 	uint	firstInstance;
 	uint	vertexPositionOffset;
 	uint	vertexNormalOffset;
-	uint	_pad0;
+	uint	vertexColorOffset;
 
 	mat4	transform;
 };

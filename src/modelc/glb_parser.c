@@ -45,7 +45,7 @@ int glb_parse(glb_t* glb, const char* filename)
 		r = fread(json, chunk_header.chunkLength, 1, f);
 		assert(r == 1);
 
-		printf("%.*s", (int)chunk_header.chunkLength, json);
+		//printf("%.*s", (int)chunk_header.chunkLength, json);
 		gltf_parse(&glb->gltf, json, chunk_header.chunkLength);
 	}
 	

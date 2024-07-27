@@ -29,7 +29,7 @@ typedef struct scb_camera {
 
 typedef struct scb_draw_model {
 	model_handle_t model;
-	mat4 transform;
+	mat4 transform[16]; // todo
 } scb_draw_model_t;
 
 typedef struct scb_point_light {

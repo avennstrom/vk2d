@@ -30,15 +30,16 @@ enum {
 };
 
 typedef struct game {
-	window_t*	window;
-	int			state;
-	bool		lockMouse;
+	window_t*				window;
+	const model_loader_t*	modelLoader;
+	int						state;
+	bool					lockMouse;
 
-	float		t;
-	player_t	player;
+	float					t;
+	player_t				player;
 
-	bool		keystate[256];
-	bool		buttonstate[2];
+	bool					keystate[256];
+	bool					buttonstate[2];
 } game_t;
 
 static vec3 GetPlayerHead(const player_t* player)
@@ -60,14 +61,15 @@ static vec3 GetPlayerLookNormal(const player_t* player)
 	return lookDir;
 }
 
-game_t* game_create(window_t* window)
+game_t* game_create(window_t* window, const model_loader_t* modelLoader)
 {
 	game_t* game = calloc(1, sizeof(game_t));
 	if (game == NULL) {
 		return NULL;
 	}
 
-	game->window	= window;
+	game->window		= window;
+	game->modelLoader	= modelLoader;
 
 	//game->player.flashlight = true;
 
@@ -232,16 +234,41 @@ int game_render(scb_t* scb, game_t* game)
 	}
 
 	{
-		mat4 m = mat_identity();
-		m = mat_translate(m, (vec3){2.0f, 0.0f, 0.0f});
-		m = mat_rotate_x(m, 0.001f * game->t);
-		m = mat_rotate_z(m, 0.001f * game->t * 0.6f);
-		m = mat_rotate_y(m, 0.001f * game->t * 0.4f);
+		const model_handle_t tankModel = {0};
+
+		mat4 m[16];
+		for (int i = 0; i < countof(m); ++i)
+		{
+			m[i] = mat_identity();
+		}
+
+		// Tank
+		m[0] = mat_translate(m[0], (vec3){sin(0.001f * game->t) * 2.0f, 0.0f, 0.0f});
+		// Turret
+		m[1] = mat_rotate_y(m[1], 0.002f * game->t * 0.4f);
+		// Pipe
+		m[2] = mat_rotate_z(m[2], sin(0.01f * game->t) * 0.2f);
+
+		// m = mat_translate(m, (vec3){2.0f, 0.0f, 0.0f});
+		// m = mat_rotate_x(m, 0.001f * game->t);
+		// m = mat_rotate_z(m, 0.001f * game->t * 0.6f);
+		// m = mat_rotate_y(m, 0.001f * game->t * 0.4f);
+
+		model_hierarchy_t hierarchy;
+		model_loader_get_model_hierarchy(&hierarchy, game->modelLoader, tankModel);
+		
+		mat4 transforms[16];
+		model_hierarchy_resolve(transforms, m, &hierarchy);
 
 		scb_draw_model_t* models = scb_draw_models(scb, 1);
 		models[0] = (scb_draw_model_t){
-			.model = {(int)(game->t * 0.001f) % 2},
-			.transform = m,
+			//.model = {(int)(game->t * 0.001f) % 2},
+			.model = tankModel,
+			.transform[0] = transforms[0],
+			.transform[1] = transforms[1],
+			.transform[2] = transforms[2],
+			.transform[3] = transforms[3],
+			.transform[4] = transforms[4],
 		};
 	}
 

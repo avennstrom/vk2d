@@ -268,7 +268,8 @@ static void gltf_json_parser_parse_primitive(gltf_parser_t* parser, gltf_mesh_t*
 				{
 					primitive->attributes[GLTF_ATTRIBUTE_NORMAL] = gltf_json_parser_eat_uint32(parser);
 				}
-				else if (gltf_json_parser_eat_key(parser, "COLOR_0"))
+				//else if (gltf_json_parser_eat_key(parser, "COLOR_0"))
+				else if (gltf_json_parser_eat_key(parser, "_COL"))
 				{
 					primitive->attributes[GLTF_ATTRIBUTE_COLOR] = gltf_json_parser_eat_uint32(parser);
 				}

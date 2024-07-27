@@ -34,12 +34,16 @@ static void pack_vertex_color_from_uint16(uint32_t* target, const uint16_t* src,
 {
 	for (size_t i = 0; i < vertexCount; ++i)
 	{
-		const uint8_t r = (uint8_t)(src[0] >> 8);
-		const uint8_t g = (uint8_t)(src[1] >> 8);
-		const uint8_t b = (uint8_t)(src[2] >> 8);
-		const uint8_t a = (uint8_t)(src[3] >> 8);
+		// const uint8_t r = (uint8_t)(src[0] >> 8);
+		// const uint8_t g = (uint8_t)(src[1] >> 8);
+		// const uint8_t b = (uint8_t)(src[2] >> 8);
+		// const uint8_t a = (uint8_t)(src[3] >> 8);
+		const uint8_t r = (uint8_t)((src[0] / (float)0xffff) * (float)0xff);
+		const uint8_t g = (uint8_t)((src[1] / (float)0xffff) * (float)0xff);
+		const uint8_t b = (uint8_t)((src[2] / (float)0xffff) * (float)0xff);
+		//const uint8_t a = (uint8_t)((src[3] / (float)0xffff) * (float)0xff);
 		
-		target[0] = r | (g << 8) | (b << 16) | (a << 24);
+		target[0] = r | (g << 8) | (b << 16);
 
 		target += 1;
 		src += 4;
@@ -146,7 +150,7 @@ static int export_model(FILE* f, const glb_t* glb, const char* rootNodeName)
 		assert(colorAccessor->count == vertexCount);
 
 		uint32_t* packedVertexColor = malloc(vertexCount * sizeof(uint32_t));
-		pack_vertex_color_from_uint16( packedVertexColor, (uint16_t*)(glb->buffer.data + colorView->byteOffset), vertexCount);
+		pack_vertex_color_from_uint16(packedVertexColor, (uint16_t*)(glb->buffer.data + colorView->byteOffset), vertexCount);
 
 		parts[i] = (model_part_t){
 			.indexCount = indexAccessor->count,
@@ -158,8 +162,48 @@ static int export_model(FILE* f, const glb_t* glb, const char* rootNodeName)
 		};
 	}
 
+	FILEFORMAT_model_part_header_t partHeaders[64];
+	uint32_t dataOffset = 0u;
+
+	for (int i = 0; i < hierarchySize; ++i)
+	{
+		const model_part_t* part = &parts[i];
+		const model_hierarchy_node_t* hierarchyNode = &hierarchy[i];
+		const gltf_node_t* gltfNode = hierarchyNode->gltfNode;
+
+		FILEFORMAT_model_part_header_t partHeader = {
+			.rotation		= (vec4){ gltfNode->rotation[0], gltfNode->rotation[1], gltfNode->rotation[2], gltfNode->rotation[3] },
+			.translation	= (vec3){ gltfNode->translation[0], gltfNode->translation[1], gltfNode->translation[2] },
+			.parentIndex	= hierarchy[i].parentIndex,
+			.indexCount		= part->indexCount,
+			.vertexCount	= part->vertexCount,
+		};
+
+		assert(dataOffset % 2 == 0);
+		partHeader.indexDataOffset = dataOffset;
+		dataOffset += part->indexCount * sizeof(uint16_t);
+
+		assert(dataOffset % 4 == 0); // for storage buffer loads
+		partHeader.vertexPositionDataOffset = dataOffset;
+		dataOffset += part->vertexCount * sizeof(vec3);
+
+		partHeader.vertexNormalDataOffset = dataOffset;
+		dataOffset += part->vertexCount * sizeof(vec3);
+		
+		partHeader.vertexColorDataOffset = dataOffset;
+		dataOffset += part->vertexCount * sizeof(uint32_t);
+
+		// printf("indexDataOffset: %u\n", partHeader.indexDataOffset);
+		// printf("vertexPositionDataOffset: %u\n", partHeader.vertexPositionDataOffset);
+		// printf("vertexNormalDataOffset: %u\n", partHeader.vertexNormalDataOffset);
+		// printf("vertexColorDataOffset: %u\n", partHeader.vertexColorDataOffset);
+
+		partHeaders[i] = partHeader;
+	}
+
 	const FILEFORMAT_model_header_t header = {
 		.partCount = hierarchySize,
+		.dataSize = dataOffset,
 	};
 
 	int r;
@@ -169,20 +213,13 @@ static int export_model(FILE* f, const glb_t* glb, const char* rootNodeName)
 	
 	r = fwrite(&header, sizeof(header), 1, f);
 	assert(r == 1);
-	
+
+	r = fwrite(partHeaders, sizeof(partHeaders[0]), hierarchySize, f);
+	assert(r == hierarchySize);
+
 	for (int i = 0; i < hierarchySize; ++i)
 	{
 		const model_part_t* part = &parts[i];
-		const model_hierarchy_node_t* hierarchyNode = &hierarchy[i];
-		const gltf_node_t* gltfNode = hierarchyNode->gltfNode;
-
-		const FILEFORMAT_model_part_header_t partHeader = {
-			.rotation = (vec4){ gltfNode->rotation[0], gltfNode->rotation[1], gltfNode->rotation[2], gltfNode->rotation[3] },
-			.translation = (vec3){ gltfNode->translation[0], gltfNode->translation[1], gltfNode->translation[2] },
-			.parentIndex	= hierarchy[i].parentIndex,
-			.indexCount		= part->indexCount,
-			.vertexCount	= part->vertexCount,
-		};
 
 		r = fwrite(glb->buffer.data + part->indexBufferView->byteOffset, part->indexBufferView->byteLength, 1, f);
 		assert(r == 1);
@@ -266,7 +303,7 @@ int main(int argc, char** argv)
 	glb_t glb;
 	glb_parse(&glb, inPath);
 
-	gltf_dump(&glb.gltf);
+	//gltf_dump(&glb.gltf);
 
 	FILE* outFile = fopen(outPath, "wb");
 	if (outFile == NULL)

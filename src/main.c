@@ -236,7 +236,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	VkExtent2D resolution = {1280, 720};
+	VkExtent2D resolution = {720, 720};
 
 	window_t* window = window_create(resolution.width, resolution.height);
 	if (window == NULL)
@@ -320,7 +320,6 @@ int main(int argc, char **argv)
 
 	uint64_t frameId = 0;
 
-	game_t *game = game_create(window);
 	scene_t *scene = scene_create(&vulkan);
 	composite_t* composite = composite_create(&vulkan);
 
@@ -332,6 +331,8 @@ int main(int argc, char **argv)
 
 	staging_memory_allocation_t stagingAllocation;
 	FinalizeStagingMemoryAllocator(&stagingAllocation, &staging_allocator);
+
+	game_t *game = game_create(window, modelLoader);
 
 	delta_timer_t deltaTimer;
 	delta_timer_reset(&deltaTimer);

@@ -176,6 +176,30 @@ mat4 mat_rotate_z(mat4 m, float rad)
 	return mat_mul(result, m);
 }
 
+mat4 mat_rotate(mat4 m, vec4 q)
+{
+    float xx = q.x*q.x;
+	float yy = q.y*q.y;
+	float zz = q.z*q.z;
+
+	float xy = q.x*q.y;
+	float xz = q.x*q.z;
+	float yz = q.y*q.z;
+
+	float wx = q.w*q.x;
+	float wy = q.w*q.y;
+	float wz = q.w*q.z;
+
+	const mat4 result = {
+		{1.f - 2.f * (yy + zz), 2.f * (xy - wz), 2.f * (xz + wy), 0.f},
+        {2.f * (xy + wz), 1.f - 2.f * (xx + zz), 2.f * (yz - wx), 0.f},
+        {2.f * (xz - wy), 2.f * (yz + wx), 1.f - 2.f * (xx + yy), 0.f},
+        {0.f, 0.f, 0.f, 1.f},
+	};
+	
+	return mat_mul(result, m);
+}
+
 mat4 mat_perspective(float fovY, float aspect, float near, float far)
 {
 	float f = 1.0f / tan(fovY / 2.0f * (3.14159265358979323846f / 180.0f));

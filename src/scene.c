@@ -414,14 +414,19 @@ void scene_draw(
 				model_info_t modelInfo;
 				if (model_loader_get_model_info(&modelInfo, rc->modelLoader, draws[i].model))
 				{
-					gpuDraws[gpuDrawCount++] = (gpu_draw_t){
-						.indexCount = modelInfo.indexCount,
-						.instanceCount = 1,
-						.firstIndex = modelInfo.indexOffset,
-						.vertexPositionOffset = modelInfo.vertexPositionOffset,
-						.vertexNormalOffset = modelInfo.vertexNormalOffset,
-						.transform = draws[i].transform,
-					};
+					for (int partIndex = 0; partIndex < modelInfo.partCount; ++partIndex)
+					{
+						const model_part_info_t* partInfo = &modelInfo.parts[partIndex];
+						gpuDraws[gpuDrawCount++] = (gpu_draw_t){
+							.indexCount = partInfo->indexCount,
+							.instanceCount = 1,
+							.firstIndex = partInfo->indexOffset,
+							.vertexPositionOffset = partInfo->vertexPositionOffset,
+							.vertexNormalOffset = partInfo->vertexNormalOffset,
+							.vertexColorOffset = partInfo->vertexColorOffset,
+							.transform = draws[i].transform[partIndex],
+						};
+					}
 				}
 			}
 			break;
