@@ -11,6 +11,7 @@ typedef struct game_resource
 	int										fd;
 	const uint8_t*							mem;
 	size_t									len;
+
 	uint									modelCount;
 	FILEFORMAT_game_resource_model_entry_t*	models;
 } game_resource_t;

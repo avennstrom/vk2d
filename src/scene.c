@@ -4,6 +4,7 @@
 #include "vulkan.h"
 #include "mat.h"
 #include "color.h"
+#include "terrain.h"
 
 #include <memory.h>
 #include <stdbool.h>
@@ -68,10 +69,14 @@ typedef struct scene
 	VkPipelineLayout		modelPipelineLayout;
 	VkPipeline				modelPipeline;
 
+	VkDescriptorSetLayout	terrainDescriptorSetLayout;
+	VkPipelineLayout		terrainPipelineLayout;
+	VkPipeline				terrainPipeline;
+
 	scene_frame_t	frames[FRAME_COUNT];
 } scene_t;
 
-static int scene_create_pipelines(scene_t* scene, vulkan_t* vulkan)
+static int scene_create_model_pipeline(scene_t* scene, vulkan_t* vulkan)
 {
 	const VkDescriptorSetLayoutBinding bindings[] = {
 		{ 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
@@ -86,7 +91,7 @@ static int scene_create_pipelines(scene_t* scene, vulkan_t* vulkan)
 	if (vkCreateDescriptorSetLayout(vulkan->device, &descriptorSetLayoutInfo, NULL, &scene->modelDescriptorSetLayout) != VK_SUCCESS) {
 		return 1;
 	}
-	SetDescriptorSetLayoutName(vulkan, scene->modelDescriptorSetLayout, "Scene");
+	SetDescriptorSetLayoutName(vulkan, scene->modelDescriptorSetLayout, "Model");
 
 	const VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
 		VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -96,7 +101,7 @@ static int scene_create_pipelines(scene_t* scene, vulkan_t* vulkan)
 	if (vkCreatePipelineLayout(vulkan->device, &pipelineLayoutInfo, NULL, &scene->modelPipelineLayout) != VK_SUCCESS) {
 		return 1;
 	}
-	SetPipelineLayoutName(vulkan, scene->modelPipelineLayout, "Scene");
+	SetPipelineLayoutName(vulkan, scene->modelPipelineLayout, "Model");
 	
 	const VkPipelineShaderStageCreateInfo stages[] = {
 		{
@@ -201,8 +206,139 @@ static int scene_create_pipelines(scene_t* scene, vulkan_t* vulkan)
 		fprintf(stderr, "vkCreateGraphicsPipelines failed\n");
 		return 1;
 	}
+	SetPipelineName(vulkan, scene->modelPipeline, "Model");
+}
 
-	return 0;
+static int scene_create_terrain_pipeline(scene_t* scene, vulkan_t* vulkan)
+{
+	const VkDescriptorSetLayoutBinding bindings[] = {
+		{ 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
+		{ 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
+	};
+	const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = {
+		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.bindingCount = countof(bindings),
+		.pBindings = bindings,
+	};
+	if (vkCreateDescriptorSetLayout(vulkan->device, &descriptorSetLayoutInfo, NULL, &scene->terrainDescriptorSetLayout) != VK_SUCCESS) {
+		return 1;
+	}
+	SetDescriptorSetLayoutName(vulkan, scene->terrainDescriptorSetLayout, "Terrain");
+
+	const VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+		VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.setLayoutCount = 1,
+		.pSetLayouts = &scene->terrainDescriptorSetLayout,
+	};
+	if (vkCreatePipelineLayout(vulkan->device, &pipelineLayoutInfo, NULL, &scene->terrainPipelineLayout) != VK_SUCCESS) {
+		return 1;
+	}
+	SetPipelineLayoutName(vulkan, scene->terrainPipelineLayout, "Terrain");
+	
+	const VkPipelineShaderStageCreateInfo stages[] = {
+		{
+			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_VERTEX_BIT,
+			.module = g_shaders.modules[SHADER_TERRAIN_VERT],
+			.pName = "vs_main",
+		},
+		{
+			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.module = g_shaders.modules[SHADER_TERRAIN_FRAG],
+			.pName = "fs_main",
+		},
+	};
+
+	const VkPipelineVertexInputStateCreateInfo vertexInput = {
+		VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+	};
+
+	const VkPipelineInputAssemblyStateCreateInfo inputAssembler = {
+		VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+	};
+
+	const VkPipelineRasterizationStateCreateInfo rasterizer = {
+		VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.cullMode = VK_CULL_MODE_NONE,
+		.lineWidth = 1.0f,
+	};
+
+	const VkPipelineMultisampleStateCreateInfo multisampling = {
+		VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+	};
+
+	const VkPipelineColorBlendAttachmentState blendAttachments[] = {
+		{
+			.blendEnable = VK_TRUE,
+			.colorBlendOp = VK_BLEND_OP_ADD,
+			.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+			.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT,
+		},
+	};
+
+	const VkPipelineColorBlendStateCreateInfo colorBlending = {
+		VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		.attachmentCount = 1,
+		.pAttachments = blendAttachments,
+	};
+
+	const VkPipelineViewportStateCreateInfo viewportState = {
+		VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+		.viewportCount = 1,
+		.scissorCount = 1,
+	};
+
+	const VkDynamicState dynamicStates[] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR,
+	};
+	
+	const VkPipelineDynamicStateCreateInfo dynamicState = {
+		VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.dynamicStateCount = countof(dynamicStates),
+		.pDynamicStates = dynamicStates,
+	};
+
+	const VkPipelineDepthStencilStateCreateInfo depthStencilState = {
+		VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable = VK_TRUE,
+		.depthWriteEnable = VK_TRUE,
+		.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+	};
+
+	const VkFormat colorFormats[] = { SCENE_COLOR_FORMAT };
+	const VkPipelineRenderingCreateInfo renderingInfo = {
+		VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+		.colorAttachmentCount = countof(colorFormats),
+		.pColorAttachmentFormats = colorFormats,
+		.depthAttachmentFormat = SCENE_DEPTH_FORMAT,
+	};
+
+	const VkGraphicsPipelineCreateInfo createInfo = {
+		VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+		.pNext = &renderingInfo,
+		.stageCount = countof(stages),
+		.pStages = stages,
+		.layout = scene->terrainPipelineLayout,
+		.pVertexInputState = &vertexInput,
+		.pInputAssemblyState = &inputAssembler,
+		.pRasterizationState = &rasterizer,
+		.pMultisampleState = &multisampling,
+		.pColorBlendState = &colorBlending,
+		.pViewportState = &viewportState,
+		.pDynamicState = &dynamicState,
+		.pDepthStencilState = &depthStencilState,
+	};
+
+	if (vkCreateGraphicsPipelines(vulkan->device, NULL, 1, &createInfo, NULL, &scene->terrainPipeline) != VK_SUCCESS) {
+		fprintf(stderr, "vkCreateGraphicsPipelines failed\n");
+		return 1;
+	}
+	SetPipelineName(vulkan, scene->terrainPipeline, "Terrain");
 }
 
 int scene_alloc_staging_mem(staging_memory_allocator_t* allocator, scene_t *scene)
@@ -236,7 +372,9 @@ scene_t *scene_create(vulkan_t *vulkan)
 	scene->scb.buf = malloc(SCB_SIZE);
 	scene->scb.size = SCB_SIZE;
 
-	r = scene_create_pipelines(scene, vulkan);
+	r = scene_create_model_pipeline(scene, vulkan);
+	assert(r == 0);
+	r = scene_create_terrain_pipeline(scene, vulkan);
 	assert(r == 0);
 
 	//scene->vertexBuffer = CreateBuffer(&scene->vertexBufferMemory, vulkan, 1024 * 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -260,6 +398,10 @@ void scene_destroy(scene_t *scene)
 	vkDestroyPipeline(vulkan->device, scene->modelPipeline, NULL);
 	vkDestroyPipelineLayout(vulkan->device, scene->modelPipelineLayout, NULL);
 	vkDestroyDescriptorSetLayout(vulkan->device, scene->modelDescriptorSetLayout, NULL);
+
+	vkDestroyPipeline(vulkan->device, scene->terrainPipeline, NULL);
+	vkDestroyPipelineLayout(vulkan->device, scene->terrainPipelineLayout, NULL);
+	vkDestroyDescriptorSetLayout(vulkan->device, scene->terrainDescriptorSetLayout, NULL);
 
 	free(scene->scb.buf);
 	free(scene);
@@ -548,6 +690,8 @@ void scene_draw(
 			0, NULL,
 			countof(imageBarriers), imageBarriers);
 	}
+
+	// Scene color pass
 	{
 		const VkRenderingAttachmentInfo colorAttachments[] = {
 			{
@@ -568,7 +712,6 @@ void scene_draw(
 			.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 			.clearValue.depthStencil.depth = 1.0f,
 		};
-
 		const VkRenderingInfo renderingInfo = {
 			VK_STRUCTURE_TYPE_RENDERING_INFO,
 			.colorAttachmentCount = countof(colorAttachments),
@@ -597,6 +740,21 @@ void scene_draw(
 				vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->modelPipeline);
 				vkCmdBindIndexBuffer(cb, modelLoaderInfo.storageBuffer, 0, VK_INDEX_TYPE_UINT16);
 				vkCmdDrawIndexedIndirect(cb, frame->drawBuffer, 0, gpuDrawCount, sizeof(gpu_draw_t));
+			}
+
+
+			terrain_info_t terrainInfo;
+			if (terrain_get_info(&terrainInfo, rc->terrain))
+			{
+				descriptor_allocator_begin(rc->dsalloc, scene->terrainDescriptorSetLayout, "SceneTerrain");
+				descriptor_allocator_set_uniform_buffer(rc->dsalloc, 0, frameUniformBuffer);
+				descriptor_allocator_set_storage_buffer(rc->dsalloc, 1, (VkDescriptorBufferInfo){ terrainInfo.heightBuffer, 0, VK_WHOLE_SIZE });
+				const VkDescriptorSet descriptorSet = descriptor_allocator_end(rc->dsalloc);
+
+				vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->terrainPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+				vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->terrainPipeline);
+				vkCmdBindIndexBuffer(cb, terrainInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+				vkCmdDrawIndexed(cb, terrainInfo.indexCount, 1, 0, 0, 0);
 			}
 			
 			FlushDebugRenderer(

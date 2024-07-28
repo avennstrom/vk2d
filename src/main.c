@@ -18,6 +18,7 @@
 #include "game_resource.h"
 #include "content.h"
 #include "vec.h"
+#include "terrain.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -239,7 +240,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	VkExtent2D resolution = {860, 860};
+	VkExtent2D resolution = {1280, 860};
 
 	window_t* window = window_create(resolution.width, resolution.height);
 	if (window == NULL)
@@ -329,12 +330,14 @@ int main(int argc, char **argv)
 	scene_t* scene = scene_create(&vulkan);
 	composite_t* composite = composite_create(&vulkan);
 	model_loader_t* modelLoader = model_loader_create(&vulkan, &gameResource, &content);
+	terrain_t* terrain = terrain_create(&vulkan);
 
 	staging_memory_allocator_t staging_allocator;
 	ResetStagingMemoryAllocator(&staging_allocator, &vulkan);
 	scene_alloc_staging_mem(&staging_allocator, scene);
 	AllocateDebugRendererStagingMemory(&staging_allocator, &debugRenderer);
 	model_loader_alloc_staging_mem(&staging_allocator, modelLoader);
+	terrain_alloc_staging_mem(&staging_allocator, terrain);
 
 	staging_memory_allocation_t stagingAllocation;
 	FinalizeStagingMemoryAllocator(&stagingAllocation, &staging_allocator);
@@ -461,9 +464,11 @@ int main(int argc, char **argv)
 			.dsalloc = &dsalloc,
 			.rt = &rt,
 			.modelLoader = modelLoader,
+			.terrain = terrain,
 		};
 
 		model_loader_update(cb, modelLoader, &rc);
+		terrain_update(cb, terrain, &rc);
 
 		{
 			const VkMemoryBarrier memoryBarriers[] = {
@@ -656,6 +661,7 @@ int main(int argc, char **argv)
 		DeinitFrame(&app.frames[i], &vulkan);
 	}
 
+	terrain_destroy(terrain);
 	model_loader_destroy(modelLoader);
 	debug_renderer_destroy(&debugRenderer, &vulkan);
 	scene_destroy(scene);

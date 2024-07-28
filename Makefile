@@ -10,11 +10,12 @@ SHADER_DIS := $(patsubst shaders/%,obj/%.spv.s,$(SHADER_FILES))
 SHADER_OBJ := $(patsubst shaders/%,obj/%.spo,$(SHADER_FILES))
 
 SHADER_OBJ := ${SHADER_OBJ} obj/model.vs.spo obj/model.fs.spo
+SHADER_OBJ := ${SHADER_OBJ} obj/terrain.vs.spo obj/terrain.fs.spo
 
-#.PHONY: shaderc
+.PHONY: shaderc run-converter
 .SECONDARY: $(SHADER_SPV)
 
-default: ${TARGET_NAME} converter
+default: shaderc ${TARGET_NAME} converter run-converter
 
 ${TARGET_NAME}: ${C_OBJ} ${SHADER_OBJ} | $(SHADER_DIS) ${H_FILES}
 	$(CC) -Werror -std=c11 -L${VULKAN_SDK}/lib -g -o $@ $^ -lvulkan -lX11 -lm
@@ -35,7 +36,10 @@ obj/%.spo: obj/%.spv
 	@ld -z noexecstack -r -b binary -o $@ $^
 
 shaderc:
-	./shaderc.py
+	./compile_shaders.sh
+
+run-converter:
+	./converter
 
 converter: src/converter/main.c src/converter/gltf_parser.c src/converter/glb_parser.c
 	$(CC) -Wall -Wshadow -Werror -std=c11 -g -o $@ $^

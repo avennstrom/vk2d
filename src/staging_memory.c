@@ -63,6 +63,8 @@ VkResult FinalizeStagingMemoryAllocator(
 	uint32_t memoryTypeIndex = FindMemoryType(allocator->vulkan, allocator->memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 	assert(memoryTypeIndex != 0xffffffffu);
 
+	allocator->allocSize = alignUp(allocator->allocSize, 0x40); //:todo:
+
 	const VkMemoryAllocateInfo memoryAllocateInfo = {
 		VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize = allocator->allocSize,

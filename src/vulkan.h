@@ -55,3 +55,4 @@ void SetDeviceMemoryName(vulkan_t* vulkan, VkDeviceMemory memory, const char* na
 void SetDescriptorSetName(vulkan_t* vulkan, VkDescriptorSet descriptorSet, const char* name);
 void SetDescriptorSetLayoutName(vulkan_t* vulkan, VkDescriptorSetLayout descriptorSetLayout, const char* name);
 void SetPipelineLayoutName(vulkan_t* vulkan, VkPipelineLayout pipelineLayout, const char* name);
+void SetPipelineName(vulkan_t* vulkan, VkPipeline pipeline, const char* name);

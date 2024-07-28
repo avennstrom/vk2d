@@ -30,6 +30,7 @@
 		"random": "cpp",
 		"memory.h": "c",
 		"intersection.h": "c",
-		"vec.h": "c"
+		"vec.h": "c",
+		"initializer_list": "c"
 	}
 }

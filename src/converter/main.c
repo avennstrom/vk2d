@@ -175,7 +175,6 @@ static int extract_model(extracted_model_t* extracted, const glb_t* glb, const c
 
 typedef struct model_convert_action
 {
-	//const char* targetPath;
 	const char* sourcePath;
 	const char* rootNodeName;
 } model_convert_action_t;
@@ -186,7 +185,7 @@ typedef struct converter
 	model_convert_action_t modelActions[1024];
 } converter_t;
 
-static void add_model_convert_action(converter_t* converter, const char* sourcePath, const char* rootNodeName)
+static void register_model(converter_t* converter, const char* sourcePath, const char* rootNodeName)
 {
 	assert(converter->modelCount < countof(converter->modelActions));
 	converter->modelActions[converter->modelCount++] = (model_convert_action_t){
@@ -203,10 +202,10 @@ static int convert(converter_t* converter)
 
 	mkdir("dat", 0700);
 
-	FILE* gameResourceFile = fopen("dat/gameresource.bin", "wb");
+	FILE* resourceFile = fopen("dat/resource.bin", "wb");
 	FILE* contentFile = fopen("dat/content.bin", "wb");
 
-	if (gameResourceFile == NULL || contentFile == NULL)
+	if (resourceFile == NULL || contentFile == NULL)
 	{
 		return 1;
 	}
@@ -215,14 +214,14 @@ static int convert(converter_t* converter)
 		.version = FILEFORMAT_game_resource_VERSION,
 		.modelCount = converter->modelCount,
 	};
-	r = fwrite(&gameResourceHeader, sizeof(gameResourceHeader), 1, gameResourceFile);
+	r = fwrite(&gameResourceHeader, sizeof(gameResourceHeader), 1, resourceFile);
 	assert(r == 1);
 	
 	FILEFORMAT_game_resource_model_entry_t* gameResourceModelEntries = calloc(converter->modelCount, sizeof(FILEFORMAT_game_resource_model_entry_t));
 	assert(gameResourceModelEntries != NULL);
 	
-	const size_t gameResourceModelEntriesOffset = ftell(gameResourceFile);
-	r = fwrite(gameResourceModelEntries, sizeof(FILEFORMAT_game_resource_model_entry_t), converter->modelCount, gameResourceFile);
+	const size_t gameResourceModelEntriesOffset = ftell(resourceFile);
+	r = fwrite(gameResourceModelEntries, sizeof(FILEFORMAT_game_resource_model_entry_t), converter->modelCount, resourceFile);
 	assert(r == converter->modelCount);
 
 	for (size_t modelIndex = 0; modelIndex < converter->modelCount; ++modelIndex)
@@ -290,12 +289,12 @@ static int convert(converter_t* converter)
 		};
 
 		gameResourceModelEntries[modelIndex] = (FILEFORMAT_game_resource_model_entry_t){
-			.headerOffset = ftell(gameResourceFile),
+			.headerOffset = ftell(resourceFile),
 		};
 		
-		r = fwrite(&header, sizeof(header), 1, gameResourceFile);
+		r = fwrite(&header, sizeof(header), 1, resourceFile);
 		assert(r == 1);
-		r = fwrite(partHeaders, sizeof(partHeaders[0]), extractedModel.partCount, gameResourceFile);
+		r = fwrite(partHeaders, sizeof(partHeaders[0]), extractedModel.partCount, resourceFile);
 		assert(r == extractedModel.partCount);
 
 		for (int i = 0; i < extractedModel.partCount; ++i)
@@ -316,18 +315,18 @@ static int convert(converter_t* converter)
 		}
 	}
 
-	const size_t writtenGameResourceSize = ftell(gameResourceFile);
+	const size_t writtenGameResourceSize = ftell(resourceFile);
 	const size_t writtenContentSize = ftell(contentFile);
 	
-	fseek(gameResourceFile, gameResourceModelEntriesOffset, SEEK_SET);
-	r = fwrite(gameResourceModelEntries, sizeof(FILEFORMAT_game_resource_model_entry_t), converter->modelCount, gameResourceFile);
+	fseek(resourceFile, gameResourceModelEntriesOffset, SEEK_SET);
+	r = fwrite(gameResourceModelEntries, sizeof(FILEFORMAT_game_resource_model_entry_t), converter->modelCount, resourceFile);
 	assert(r == converter->modelCount);
 
 	printf("Converter finished.\n");
 	printf("Game resource: %zu bytes\n", writtenGameResourceSize);
 	printf("Content: %zu bytes\n", writtenContentSize);
 
-	fclose(gameResourceFile);
+	fclose(resourceFile);
 	fclose(contentFile);
 
 	return 0;
@@ -337,8 +336,8 @@ int main(int argc, char** argv)
 {
 	converter_t converter = {};
 
-	add_model_convert_action(&converter, "content/tank.glb", "Tank");
-	add_model_convert_action(&converter, "content/colortest.glb", "Cube");
+	register_model(&converter, "content/tank.glb", "Tank");
+	register_model(&converter, "content/colortest.glb", "Cube");
 
 	convert(&converter);
 

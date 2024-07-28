@@ -23,6 +23,8 @@ SHADER_BLOB(world_shadow_vert);
 SHADER_BLOB(world_shadow_geom);
 SHADER_BLOB(model_vs);
 SHADER_BLOB(model_fs);
+SHADER_BLOB(terrain_vs);
+SHADER_BLOB(terrain_fs);
 
 shader_library_t g_shaders = {};
 
@@ -62,6 +64,8 @@ int InitShaderLibrary(vulkan_t* vulkan)
 	g_shaders.modules[SHADER_WORLD_SHADOW_GEOM] = createShaderModule(vulkan, SHADER_ARG_HELPER(world_shadow_geom));
 	g_shaders.modules[SHADER_MODEL_VERT] = createShaderModule(vulkan, SHADER_ARG_HELPER(model_vs));
 	g_shaders.modules[SHADER_MODEL_FRAG] = createShaderModule(vulkan, SHADER_ARG_HELPER(model_fs));
+	g_shaders.modules[SHADER_TERRAIN_VERT] = createShaderModule(vulkan, SHADER_ARG_HELPER(terrain_vs));
+	g_shaders.modules[SHADER_TERRAIN_FRAG] = createShaderModule(vulkan, SHADER_ARG_HELPER(terrain_fs));
 	return 0;
 }
 

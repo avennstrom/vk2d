@@ -6,7 +6,7 @@
 
 int game_resource_open(game_resource_t* gameResource)
 {
-	gameResource->fd = open("dat/gameresource.bin", O_RDONLY);
+	gameResource->fd = open("dat/resource.bin", O_RDONLY);
 	if (gameResource->fd == -1)
 	{
 		fprintf(stderr, "Failed to open game resource file.\n");

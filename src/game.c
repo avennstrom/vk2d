@@ -302,12 +302,11 @@ int game_render(scb_t* scb, game_t* game)
 			.transform[5] = transforms[5],
 		};
 
+#if 0
 		for (int i = 0; i < countof(m); ++i)
 		{
 			m[i] = mat_identity();
 		}
-
-
 		m[0] = mat_translate(m[0], (vec3){ 10.0f, 0.0f, 0.0f });
 
 		model_loader_get_model_hierarchy(&hierarchy, game->modelLoader, MODEL_COLORTEST);
@@ -322,6 +321,7 @@ int game_render(scb_t* scb, game_t* game)
 			.transform[4] = transforms[4],
 			.transform[5] = transforms[5],
 		};
+#endif
 	}
 
 #if 0

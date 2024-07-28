@@ -497,3 +497,8 @@ void SetPipelineLayoutName(vulkan_t* vulkan, VkPipelineLayout pipelineLayout, co
 {
 	SetObjectName(vulkan, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (uint64_t)pipelineLayout, name);
 }
+
+void SetPipelineName(vulkan_t* vulkan, VkPipeline pipeline, const char* name)
+{
+	SetObjectName(vulkan, VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipeline, name);
+}
