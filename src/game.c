@@ -139,29 +139,6 @@ int game_window_event(game_t* game, const window_event_t* event)
 
 static void TickPlayerMovement(game_t* game, float deltaTime)
 {
-#if 0
-	// look	
-	float lookX = 0.0f;
-	float lookY = 0.0f;
-
-	if (game->keystate[KEY_LEFT]) {
-		lookX -= PLAYER_SENSITIVITY;
-	}
-	if (game->keystate[KEY_RIGHT]) {
-		lookX += PLAYER_SENSITIVITY;
-	}
-	if (game->keystate[KEY_UP]) {
-		lookY -= PLAYER_SENSITIVITY;
-	}
-	if (game->keystate[KEY_DOWN]) {
-		lookY += PLAYER_SENSITIVITY;
-	}
-	
-	game->player.yaw += lookX;
-	game->player.pitch += lookY;
-	game->player.pitch = clampf(-1.0f, game->player.pitch, 1.0f);
-#endif
-
 	// move
 	float moveX = 0.0f;
 	float moveY = 0.0f;
@@ -302,22 +279,14 @@ int game_render(scb_t* scb, game_t* game)
 			*m_turret = mat_rotate_y(*m_turret, aimAngle);
 		}
 
-		// m = mat_translate(m, (vec3){2.0f, 0.0f, 0.0f});
-		// m = mat_rotate_x(m, 0.001f * game->t);
-		// m = mat_rotate_z(m, 0.001f * game->t * 0.6f);
-		// m = mat_rotate_y(m, 0.001f * game->t * 0.4f);
-
 		model_loader_get_model_hierarchy(&hierarchy, game->modelLoader, MODEL_TANK);
 		model_hierarchy_resolve(transforms, m, &hierarchy);
 		
 		{
 			const vec3 localAimTarget = mat_mul_vec3(mat_invert(transforms[g_model_tank.node_pipe]), game->aimTarget);
-			//printf("%.4f, %.4f, %.4f\n", localAimTarget.x, localAimTarget.y, localAimTarget.z);
 			const float aimAngle = atan2f(localAimTarget.x, localAimTarget.y);
 			*m_pipe = mat_rotate_z(*m_pipe, aimAngle);
 		}
-
-		//*m_pipe = mat_rotate_z(*m_pipe, sin(0.01f * game->t) * 0.2f);
 
 		model_hierarchy_resolve(transforms, m, &hierarchy);
 

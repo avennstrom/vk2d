@@ -101,11 +101,13 @@ static int extract_model(extracted_model_t* extracted, const glb_t* glb, const c
 
 	const size_t partCount = hierarchySize;
 
+#if 0
 	for (size_t i = 0; i < partCount; ++i)
 	{
 		printf("hierarchy[%zu].name: %s\n", i, extracted->hierarchy[i].gltfNode->name);
 		printf("hierarchy[%zu].parentIndex: %u\n", i, extracted->hierarchy[i].parentIndex);
 	}
+#endif
 
 	for (size_t i = 0; i < partCount; ++i)
 	{
@@ -197,6 +199,8 @@ static int convert(converter_t* converter)
 {
 	int r;
 
+	printf("Converting...\n");
+
 	mkdir("dat", 0700);
 
 	FILE* gameResourceFile = fopen("dat/gameresource.bin", "wb");
@@ -224,6 +228,8 @@ static int convert(converter_t* converter)
 	for (size_t modelIndex = 0; modelIndex < converter->modelCount; ++modelIndex)
 	{
 		const model_convert_action_t* action = &converter->modelActions[modelIndex];
+
+		printf("%s (root: %s)\n", action->sourcePath, action->rootNodeName);
 
 		glb_t glb;
 		if (glb_parse(&glb, action->sourcePath) != 0)
@@ -309,10 +315,17 @@ static int convert(converter_t* converter)
 			assert(r == 1);
 		}
 	}
+
+	const size_t writtenGameResourceSize = ftell(gameResourceFile);
+	const size_t writtenContentSize = ftell(contentFile);
 	
 	fseek(gameResourceFile, gameResourceModelEntriesOffset, SEEK_SET);
 	r = fwrite(gameResourceModelEntries, sizeof(FILEFORMAT_game_resource_model_entry_t), converter->modelCount, gameResourceFile);
 	assert(r == converter->modelCount);
+
+	printf("Converter finished.\n");
+	printf("Game resource: %zu bytes\n", writtenGameResourceSize);
+	printf("Content: %zu bytes\n", writtenContentSize);
 
 	fclose(gameResourceFile);
 	fclose(contentFile);

@@ -135,8 +135,6 @@ void model_loader_update(VkCommandBuffer cb, model_loader_t* modelLoader, const 
 			case MODEL_STATE_READ_DATA:
 			{
 				uint8_t* data = modelLoader->stagingMemory + model->stagingAllocation.offset;
-				//const int nread = fread(data, 1, model->header.dataSize, model->file);
-				//assert(nread == model->header.dataSize); // :todo:
 				content_read(data, modelLoader->content, model->header.contentOffset, model->header.dataSize);
 				
 				model->state = MODEL_STATE_UPLOAD_DATA;
@@ -157,8 +155,6 @@ void model_loader_update(VkCommandBuffer cb, model_loader_t* modelLoader, const 
 		
 		if (model->state == MODEL_STATE_LOADED)
 		{
-			printf("Model loaded.\n");
-
 			*prevnext = model->next;
 			model->next = NULL;
 			model = *prevnext;
@@ -215,11 +211,6 @@ static void model_loader_start_load_models(model_loader_t* modelLoader, const ga
 		model->next = modelLoader->loadingModels;
 		modelLoader->loadingModels = model;
 	}
-
-	//model_loader_start_load_model(modelLoader, &modelLoader->models[0], "dat/tank.model");
-	//model_loader_start_load_model(modelLoader, &modelLoader->models[0], "dat/colortest.model");
-	//model_loader_start_load_model(modelLoader, &modelLoader->models[1], "dat/cube.model");
-	//model_loader_start_load_model(modelLoader, &modelLoader->models[2], "dat/sphere.model");
 }
 
 void model_loader_get_info(model_loader_info_t* info, const model_loader_t* modelLoader)

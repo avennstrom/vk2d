@@ -30,8 +30,8 @@ int glb_parse(glb_t* glb, const char* filename)
 		return 1;
 	}
 	
-	printf("glb version: %u\n", header.version);
-	printf("glb length: %u\n", header.length);
+	// printf("glb version: %u\n", header.version);
+	// printf("glb length: %u\n", header.length);
 
 	// JSON chunk
 	{
@@ -39,7 +39,7 @@ int glb_parse(glb_t* glb, const char* filename)
 		assert(r == 1);
 		assert(chunk_header.chunkType == GLB_CHUNK_TYPE_JSON);
 
-		printf("glb JSON chunk length: %u\n", chunk_header.chunkLength);
+		//printf("glb JSON chunk length: %u\n", chunk_header.chunkLength);
 
 		char* json = malloc(chunk_header.chunkLength);
 		r = fread(json, chunk_header.chunkLength, 1, f);
@@ -55,7 +55,7 @@ int glb_parse(glb_t* glb, const char* filename)
 		assert(r == 1);
 		assert(chunk_header.chunkType == GLB_CHUNK_TYPE_BIN);
 		
-		printf("glb buffer chunk length: %u\n", chunk_header.chunkLength);
+		//printf("glb buffer chunk length: %u\n", chunk_header.chunkLength);
 
 		glb->buffer.len = chunk_header.chunkLength;
 		glb->buffer.data = malloc(chunk_header.chunkLength);

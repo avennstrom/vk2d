@@ -113,34 +113,8 @@ static int scene_create_pipelines(scene_t* scene, vulkan_t* vulkan)
 		},
 	};
 
-	// const VkVertexInputBindingDescription vertexBindings[] = {
-	// 	{
-	// 		.binding = 0,
-	// 		.stride = sizeof(debug_vertex_t),
-	// 		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-	// 	}
-	// };
-
-	// const VkVertexInputAttributeDescription vertexAttributes[] = {
-	// 	{
-	// 		.binding = 0,
-	// 		.location = 0,
-	// 		.format = VK_FORMAT_R32G32B32_SFLOAT,
-	// 	},
-	// 	{
-	// 		.binding = 0,
-	// 		.location = 1,
-	// 		.format = VK_FORMAT_R8G8B8A8_UNORM,
-	// 		.offset = offsetof(debug_vertex_t, color),
-	// 	}
-	// };
-
 	const VkPipelineVertexInputStateCreateInfo vertexInput = {
 		VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-		// .vertexBindingDescriptionCount = countof(vertexBindings),
-		// .pVertexBindingDescriptions = vertexBindings,
-		// .vertexAttributeDescriptionCount = countof(vertexAttributes),
-		// .pVertexAttributeDescriptions = vertexAttributes,
 	};
 
 	const VkPipelineInputAssemblyStateCreateInfo inputAssembler = {
