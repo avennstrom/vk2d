@@ -17,6 +17,7 @@
 #include "model_loader.h"
 #include "game_resource.h"
 #include "content.h"
+#include "vec.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -238,7 +239,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	VkExtent2D resolution = {720, 720};
+	VkExtent2D resolution = {860, 860};
 
 	window_t* window = window_create(resolution.width, resolution.height);
 	if (window == NULL)
@@ -411,9 +412,14 @@ int main(int argc, char **argv)
 		//
 		const float deltaTime = (float)delta_timer_capture(&deltaTimer);
 
+		const game_viewport_t gameViewport = {
+			.width = resolution.width,
+			.height = resolution.height,
+		};
+
 		MakeCurrentDebugRenderer(&debugRenderer);
 		
-		TickGame(game, deltaTime);
+		game_tick(game, deltaTime, &gameViewport);
 
 		//
 		// ---- render ----
@@ -427,6 +433,17 @@ int main(int argc, char **argv)
 		assert(scb != NULL);
 
 		game_render(scb, game);
+
+		{
+			mat4 m = mat_identity();
+			m = mat_rotate_z(m, 3.141592f / -2.0f);
+			m = mat_translate(m, (vec3){0.0f, 1.0f, 0.0f});
+
+			vec4 v = {1.0f, 0.0f, 0.0f, 1.0f};
+			v = mat_mul_vec4(m, v);
+			
+			DrawDebugCross(vec4_xyz(v), 1.0f, 0xffffffff);
+		}
 
 		VkCommandBuffer cb = frame->cb;
 

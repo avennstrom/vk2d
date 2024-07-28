@@ -3,6 +3,8 @@
 #include "scene.h"
 #include "util.h"
 #include "rng.h"
+#include "intersection.h"
+#include "vec.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -34,7 +36,6 @@ static const model_tank_t g_model_tank = {
 };
 
 typedef struct player {
-	byte	flashlight : 1;
 	vec3	pos;
 	float	yaw;
 	float	pitch;
@@ -50,9 +51,13 @@ typedef struct game {
 	const model_loader_t*	modelLoader;
 	int						state;
 	bool					lockMouse;
+	float					aspectRatio;
+	int						mouseX;
+	int						mouseY;
 
 	float					t;
 	player_t				player;
+	vec3					aimTarget;
 
 	bool					keystate[256];
 	bool					buttonstate[2];
@@ -105,9 +110,6 @@ int game_window_event(game_t* game, const window_event_t* event)
 	switch (event->type) {
 		case WINDOW_EVENT_KEY_DOWN:
 			game->keystate[event->data.key.code] = true;
-			if (event->data.key.code == KEY_F) {
-				game->player.flashlight = !game->player.flashlight;
-			}
 			break;
 		case WINDOW_EVENT_KEY_UP:
 			game->keystate[event->data.key.code] = false;
@@ -127,6 +129,8 @@ int game_window_event(game_t* game, const window_event_t* event)
 				game->player.yaw += event->data.mouse.dx * PLAYER_SENSITIVITY;
 				game->player.pitch += event->data.mouse.dy * PLAYER_SENSITIVITY;
 			}
+			game->mouseX = event->data.mouse.x;
+			game->mouseY = event->data.mouse.y;
 			break;
 	}
 
@@ -198,9 +202,29 @@ static void TickPlayerMovement(game_t* game, float deltaTime)
 	}
 }
 
-void TickGame(game_t* game, float deltaTime)
+static void calculate_camera(scb_camera_t* camera, const player_t* player, float aspectRatio)
+{
+	mat4 m = mat_identity();
+	m = mat_translate(m, GetPlayerHead(player));
+	m = mat_rotate_y(m, player->yaw);
+	m = mat_rotate_x(m, player->pitch);
+
+	const mat4 viewMatrix = mat_invert(m);
+	const mat4 projectionMatrix = mat_perspective(70.0f, aspectRatio, 0.1f, 256.0f);
+	const mat4 viewProjectionMatrix = mat_mul(viewMatrix, projectionMatrix);
+
+	// :TODO: transpose these in the scene instead
+	camera->transform = mat_transpose(m);
+	camera->viewMatrix = mat_transpose(viewMatrix);
+	camera->projectionMatrix = mat_transpose(projectionMatrix);
+	camera->viewProjectionMatrix = mat_transpose(viewProjectionMatrix);
+}
+
+void game_tick(game_t* game, float deltaTime, const game_viewport_t* viewport)
 {
 	int r;
+
+	game->aspectRatio = viewport->width / (float)viewport->height;
 
 	switch (game->state) {
 		case GameState_LoadScene:
@@ -212,6 +236,30 @@ void TickGame(game_t* game, float deltaTime)
 		case GameState_Play:
 		{
 			TickPlayerMovement(game, deltaTime);
+			
+			scb_camera_t camera;
+			calculate_camera(&camera, &game->player, game->aspectRatio);
+			
+			const mat4 inverseViewProjection = mat_invert(mat_transpose(camera.viewProjectionMatrix));
+			
+			vec2 mouseUV = {game->mouseX / (float)viewport->width, game->mouseY / (float)viewport->height};
+			mouseUV.y = 1.0f - mouseUV.y;
+			mouseUV.x = mouseUV.x * 2.0f - 1.0f;
+			mouseUV.y = mouseUV.y * 2.0f - 1.0f;
+			
+			vec3 near = mat_mul_hom(inverseViewProjection, (vec4){mouseUV.x, mouseUV.y, 0.0f, 1.0f});
+			vec3 far = mat_mul_hom(inverseViewProjection, (vec4){mouseUV.x, mouseUV.y, 1.0f, 1.0f});
+
+			vec3 dir = vec3_normalize(vec3_sub(far, near));
+			
+			float hitDistance;
+			if (intersect_ray_plane(&hitDistance, near, dir, (vec4){0.0f, 1.0f, 0.0f, 1.0f}))
+			{
+				vec3 hitPos = vec3_add(near, vec3_scale(dir, hitDistance));
+				DrawDebugCross(hitPos, 1.0f, 0xffffff00);
+				
+				game->aimTarget = hitPos;
+			}
 		}
 	}
 
@@ -224,32 +272,14 @@ int game_render(scb_t* scb, game_t* game)
 {
 	scb_point_light_t* point_light;
 	scb_spot_light_t* spot_light;
-	
-	*scb_set_camera(scb) = (scb_camera_t){
-		.pos	= GetPlayerHead(&game->player),
-		.yaw	= game->player.yaw,
-		.pitch	= game->player.pitch,
-	};
-	
-	if (game->player.flashlight) {
-		float3 head = GetPlayerHead(&game->player);
-		//head.x += 2.0f;
 
-		mat4 m = mat_identity();
-		m = mat_translate(m, head);
-		m = mat_rotate_y(m, game->player.yaw);
-		m = mat_rotate_x(m, game->player.pitch);
+	calculate_camera(scb_set_camera(scb), &game->player, game->aspectRatio);
 
-		spot_light = scb_add_spot_lights(scb, 1);
-		spot_light[0] = (scb_spot_light_t){
-			.transform	= m,
-			.range		= 20.0f,
-			.radius		= 90.0f,
-			.color		= {0.5f, 0.5f, 0.5f},
-		};
-	}
+	vec3 targetPos = {};
 
 	{
+		model_hierarchy_t hierarchy;
+		mat4 transforms[16];
 		mat4 m[16];
 
 		for (int i = 0; i < countof(m); ++i)
@@ -261,19 +291,34 @@ int game_render(scb_t* scb, game_t* game)
 		mat4* m_turret = &m[g_model_tank.node_turret];
 		mat4* m_pipe = &m[g_model_tank.node_pipe];
 
-		*m_body = mat_translate(*m_body, (vec3){sin(0.001f * game->t) * 2.0f, 0.0f, 0.0f});
-		*m_turret = mat_rotate_y(*m_turret, 0.002f * game->t * 0.4f);
-		*m_pipe = mat_rotate_z(*m_pipe, sin(0.01f * game->t) * 0.2f);
+		const vec3 tankPos = (vec3){sin(0.001f * game->t) * 3.0f, 0.0f, 0.0f};
+		//const vec3 tankPos = (vec3){0.0f, 0.0f, 0.0f};
+
+		*m_body = mat_translate(*m_body, tankPos);
+		
+		{
+			const vec2 aimVec = vec3_xz(vec3_sub(game->aimTarget, tankPos));
+			const float aimAngle = atan2f(-aimVec.y, -aimVec.x);
+			*m_turret = mat_rotate_y(*m_turret, aimAngle);
+		}
 
 		// m = mat_translate(m, (vec3){2.0f, 0.0f, 0.0f});
 		// m = mat_rotate_x(m, 0.001f * game->t);
 		// m = mat_rotate_z(m, 0.001f * game->t * 0.6f);
 		// m = mat_rotate_y(m, 0.001f * game->t * 0.4f);
 
-		model_hierarchy_t hierarchy;
 		model_loader_get_model_hierarchy(&hierarchy, game->modelLoader, MODEL_TANK);
+		model_hierarchy_resolve(transforms, m, &hierarchy);
 		
-		mat4 transforms[16];
+		{
+			const vec3 localAimTarget = mat_mul_vec3(mat_invert(transforms[g_model_tank.node_pipe]), game->aimTarget);
+			//printf("%.4f, %.4f, %.4f\n", localAimTarget.x, localAimTarget.y, localAimTarget.z);
+			const float aimAngle = atan2f(localAimTarget.x, localAimTarget.y);
+			*m_pipe = mat_rotate_z(*m_pipe, aimAngle);
+		}
+
+		//*m_pipe = mat_rotate_z(*m_pipe, sin(0.01f * game->t) * 0.2f);
+
 		model_hierarchy_resolve(transforms, m, &hierarchy);
 
 		scb_draw_model_t* models = scb_draw_models(scb, 2);

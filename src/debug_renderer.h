@@ -67,3 +67,4 @@ void DrawDebugPoint(debug_vertex_t vertex);
 void DrawDebugLine(debug_vertex_t v0, debug_vertex_t v1);
 void DrawDebugTriangle(debug_vertex_t v0, debug_vertex_t v1, debug_vertex_t v2);
 void DrawDebugBox(vec3 a, vec3 b, uint32_t color);
+void DrawDebugCross(vec3 p, float size, uint32_t color);

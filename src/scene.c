@@ -346,31 +346,6 @@ scb_spot_light_t *scb_add_spot_lights(scb_t *scb, size_t count)
 	return (scb_spot_light_t *)scb_append(scb, count, SCB_CMD_SPOT_LIGHT, sizeof(scb_spot_light_t));
 }
 
-typedef struct camera
-{
-	mat4 transform;
-	mat4 viewMatrix;
-	mat4 projectionMatrix;
-	mat4 viewProjectionMatrix;
-} camera_t;
-
-static void calculate_camera(camera_t *camera, const scb_camera_t *scb_camera, float aspectRatio)
-{
-	mat4 m = mat_identity();
-	m = mat_translate(m, scb_camera->pos);
-	m = mat_rotate_y(m, scb_camera->yaw);
-	m = mat_rotate_x(m, scb_camera->pitch);
-
-	const mat4 viewMatrix = mat_invert(m);
-	const mat4 projectionMatrix = mat_perspective(70.0f, aspectRatio, 0.1f, 256.0f);
-	const mat4 viewProjectionMatrix = mat_mul(viewMatrix, projectionMatrix);
-
-	camera->transform = mat_transpose(m);
-	camera->viewMatrix = mat_transpose(viewMatrix);
-	camera->projectionMatrix = mat_transpose(projectionMatrix);
-	camera->viewProjectionMatrix = mat_transpose(viewProjectionMatrix);
-}
-
 void scene_draw(
 	VkCommandBuffer cb,
 	scene_t* scene,
@@ -471,13 +446,8 @@ void scene_draw(
 		ptr += sizeof(scb_command_header_t) + header->count * cmdsize;
 	}
 
-	float aspectRatio = rc->rt->resolution.width / (float)rc->rt->resolution.height;
-
-	camera_t camera;
-	calculate_camera(&camera, &scb->camera, aspectRatio);
-
 	(*frame->uniforms) = (gpu_frame_uniforms_t){
-		.matViewProj		= camera.viewProjectionMatrix,
+		.matViewProj		= scb->camera.viewProjectionMatrix,
 		.pointLightCount	= gpuPointLightCount,
 		.spotLightCount		= gpuSpotLightCount,
 		.drawCount			= gpuDrawCount,

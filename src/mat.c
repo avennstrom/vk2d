@@ -1,4 +1,5 @@
 #include "mat.h"
+#include "vec.h"
 
 #include <math.h>
 
@@ -210,4 +211,32 @@ mat4 mat_perspective(float fovY, float aspect, float near, float far)
 		{0, 0, (far + near) / (near - far), -1},
 		{0, 0, (2.f * far * near) / (near - far), 0},
 	};
+}
+
+vec3 mat_mul_vec3(mat4 m, vec3 v)
+{
+	return (vec3){
+		(v.x * m.r0.x) + (v.y * m.r1.x) + (v.z * m.r2.x) + m.r3.x,
+		(v.x * m.r0.y) + (v.y * m.r1.y) + (v.z * m.r2.y) + m.r3.y,
+		(v.x * m.r0.z) + (v.y * m.r1.z) + (v.z * m.r2.z) + m.r3.z,
+	};
+}
+
+vec4 mat_mul_vec4(mat4 m, vec4 v)
+{
+	return (vec4){
+		(v.x * m.r0.x) + (v.y * m.r1.x) + (v.z * m.r2.x) + (v.w * m.r3.x),
+		(v.x * m.r0.y) + (v.y * m.r1.y) + (v.z * m.r2.y) + (v.w * m.r3.y),
+		(v.x * m.r0.z) + (v.y * m.r1.z) + (v.z * m.r2.z) + (v.w * m.r3.z),
+		(v.x * m.r0.w) + (v.y * m.r1.w) + (v.z * m.r2.w) + (v.w * m.r3.w),
+	};
+}
+
+vec3 mat_mul_hom(mat4 m, vec4 v)
+{
+	vec4 v4 = mat_mul_vec4(m, v);
+	v4.x /= v4.w;
+	v4.y /= v4.w;
+	v4.z /= v4.w;
+	return vec4_xyz(v4);
 }

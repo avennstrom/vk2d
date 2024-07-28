@@ -28,6 +28,8 @@
 		"span": "c",
 		"stat.h": "c",
 		"random": "cpp",
-		"memory.h": "c"
+		"memory.h": "c",
+		"intersection.h": "c",
+		"vec.h": "c"
 	}
 }

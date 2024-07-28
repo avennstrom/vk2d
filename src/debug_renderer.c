@@ -206,6 +206,14 @@ void DrawDebugBox(vec3 a, vec3 b, uint32_t color)
 	DrawDebugLine((debug_vertex_t){b.x, b.y, a.z, color}, (debug_vertex_t){b.x, b.y, b.z, color});
 }
 
+void DrawDebugCross(vec3 p, float size, uint32_t color)
+{
+	const float e = size * 0.5f;
+	DrawDebugLine((debug_vertex_t){p.x - e, p.y, p.z, color}, (debug_vertex_t){p.x + e, p.y, p.z, color});
+	DrawDebugLine((debug_vertex_t){p.x, p.y - e, p.z, color}, (debug_vertex_t){p.x, p.y + e, p.z, color});
+	DrawDebugLine((debug_vertex_t){p.x, p.y, p.z - e, color}, (debug_vertex_t){p.x, p.y, p.z + e, color});
+}
+
 static int CreateDebugPipeline(
 	VkPipeline* pipeline, 
 	vulkan_t* vulkan, 

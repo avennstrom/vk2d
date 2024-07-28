@@ -22,9 +22,10 @@ scb_t*		scene_begin(scene_t *scene);
 void		scene_draw(VkCommandBuffer cb, scene_t* scene, scb_t* scb, const render_context_t* rc, debug_renderer_t* debugRenderer);
 
 typedef struct scb_camera {
-	vec3 pos;
-	float pitch;
-	float yaw;
+	mat4 transform;
+	mat4 viewMatrix;
+	mat4 projectionMatrix;
+	mat4 viewProjectionMatrix;
 } scb_camera_t;
 
 typedef struct scb_draw_model {
