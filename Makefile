@@ -24,7 +24,7 @@ obj:
 	@mkdir -p obj
 
 obj/%.o: src/%.c | obj
-	$(CC) -Werror -std=c11 -I${VULKAN_SDK}/include -g -c -o $@ $^
+	$(CC) -std=c11 -I${VULKAN_SDK}/include -Werror -g -MMD -MF $@.d -c -o $@ $<
 
 obj/%.spv: shaders/%
 	glslangValidator -V -o $@ $^
@@ -54,3 +54,5 @@ debug:
 	@echo $(SHADER_OBJ)
 	@echo $(C_FILES)
 	@echo $(C_OBJ)
+
+-include $(C_OBJ:.o=.o.d)
