@@ -21,6 +21,7 @@ enum key_code {
 	KEY_DOWN,
 	KEY_SPACE,
 	KEY_CONTROL,
+	KEY_SHIFT,
 };
 
 enum button {

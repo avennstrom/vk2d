@@ -40,11 +40,14 @@ void PushStagingBufferAllocation(
 	VkMemoryRequirements memoryRequirements;
 	vkGetBufferMemoryRequirements(allocator->vulkan->device, *buffer, &memoryRequirements);
 
-	const VkDeviceSize alignment = memoryRequirements.alignment;
-	const VkDeviceSize offset = (allocator->allocSize + alignment - 1) / alignment * alignment;
+	//assert(memoryRequirements.alignment == 0);
+	const VkDeviceSize alignment = max(memoryRequirements.alignment, 64);
+
+	allocator->allocSize = alignUp(allocator->allocSize, alignment);
+	const VkDeviceSize offset = allocator->allocSize;
 
 	allocator->memoryTypeBits |= memoryRequirements.memoryTypeBits;
-	allocator->allocSize = offset + memoryRequirements.size;
+	allocator->allocSize = offset + alignUp(memoryRequirements.size, 64);
 
 	allocator->handles[allocator->count] = *buffer;
 	allocator->names[allocator->count] = debugName;
@@ -62,8 +65,6 @@ VkResult FinalizeStagingMemoryAllocator(
 
 	uint32_t memoryTypeIndex = FindMemoryType(allocator->vulkan, allocator->memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 	assert(memoryTypeIndex != 0xffffffffu);
-
-	allocator->allocSize = alignUp(allocator->allocSize, 0x40); //:todo:
 
 	const VkMemoryAllocateInfo memoryAllocateInfo = {
 		VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,

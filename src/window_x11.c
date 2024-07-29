@@ -116,6 +116,7 @@ enum key_code MapKeyCode(XKeyEvent* event)
 		case XK_Down:		return KEY_DOWN;
 		case XK_space:		return KEY_SPACE;
 		case XK_Control_L:	return KEY_CONTROL;
+		case XK_Shift_L:	return KEY_SHIFT;
 	}
 
 	return KEY_UNKNOWN;

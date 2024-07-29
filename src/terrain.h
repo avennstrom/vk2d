@@ -18,6 +18,7 @@ typedef struct terrain_info {
 	VkBuffer		indexBuffer;
 	uint			indexCount;
 	VkBuffer		heightBuffer;
+	VkBuffer		normalBuffer;
 } terrain_info_t;
 
 bool terrain_get_info(terrain_info_t* info, const terrain_t* terrain);

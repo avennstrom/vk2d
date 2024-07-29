@@ -14,7 +14,8 @@
 #include <stdbool.h>
 
 #define PLAYER_HEIGHT		1.75f
-#define PLAYER_SPEED		0.01f
+#define PLAYER_SPEED		0.05f
+#define PLAYER_SPEED_BOOST	4.0f
 #define PLAYER_SENSITIVITY	0.0015f
 
 #define MAX_ENEMIES			4
@@ -94,8 +95,9 @@ game_t* game_create(window_t* window, const model_loader_t* modelLoader)
 
 	//game->player.flashlight = true;
 
-	game->player.pos.z = 4.0f;
+	game->player.pos.z = -4.0f;
 	game->player.pitch = 0.3f;
+	game->player.yaw = 3.141592f * 0.75f;
 
 	return game;
 }
@@ -168,14 +170,19 @@ static void TickPlayerMovement(game_t* game, float deltaTime)
 	const float s = sinf(game->player.yaw);
 	const float c = cosf(game->player.yaw);
 
-	game->player.pos.x += (moveX * PLAYER_SPEED * c) + (moveY * PLAYER_SPEED * s);
-	game->player.pos.z += (moveX * PLAYER_SPEED * s) + (moveY * PLAYER_SPEED * -c);
+	float speed = PLAYER_SPEED;
+	if (game->keystate[KEY_SHIFT]) {
+		speed *= PLAYER_SPEED_BOOST;
+	}
+
+	game->player.pos.x += (moveX * speed * c) + (moveY * speed * s);
+	game->player.pos.z += (moveX * speed * s) + (moveY * speed * -c);
 
 	if (game->keystate[KEY_SPACE]) {
-		game->player.pos.y += PLAYER_SPEED * deltaTime;
+		game->player.pos.y += speed * deltaTime;
 	}
 	if (game->keystate[KEY_CONTROL]) {
-		game->player.pos.y -= PLAYER_SPEED * deltaTime;
+		game->player.pos.y -= speed * deltaTime;
 	}
 }
 
@@ -187,7 +194,7 @@ static void calculate_camera(scb_camera_t* camera, const player_t* player, float
 	m = mat_rotate_x(m, player->pitch);
 
 	const mat4 viewMatrix = mat_invert(m);
-	const mat4 projectionMatrix = mat_perspective(70.0f, aspectRatio, 0.1f, 256.0f);
+	const mat4 projectionMatrix = mat_perspective(70.0f, aspectRatio, 0.1f, 1024.0f);
 	const mat4 viewProjectionMatrix = mat_mul(viewMatrix, projectionMatrix);
 
 	// :TODO: transpose these in the scene instead

@@ -1,9 +1,13 @@
+#pragma once
+
 #define MAX_DRAWS (1024)
 #define MAX_POINT_LIGHTS (64)
 #define MAX_SPOT_LIGHTS (32)
 
-#define TERRAIN_PATCH_SIZE 128u
+#define TERRAIN_PATCH_SIZE 16u
+#define TERRAIN_PATCH_COUNT 32u
 #define TERRAIN_PATCH_INDEX_STRIDE (TERRAIN_PATCH_SIZE + 1u)
+#define TERRAIN_PATCH_VERTEX_COUNT (TERRAIN_PATCH_INDEX_STRIDE * TERRAIN_PATCH_INDEX_STRIDE)
 
 #ifdef __STDC__
 typedef struct gpu_draw_t gpu_draw_t;

@@ -214,6 +214,7 @@ static int scene_create_terrain_pipeline(scene_t* scene, vulkan_t* vulkan)
 	const VkDescriptorSetLayoutBinding bindings[] = {
 		{ 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
 		{ 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
+		{ 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
 	};
 	const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = {
 		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -749,12 +750,13 @@ void scene_draw(
 				descriptor_allocator_begin(rc->dsalloc, scene->terrainDescriptorSetLayout, "SceneTerrain");
 				descriptor_allocator_set_uniform_buffer(rc->dsalloc, 0, frameUniformBuffer);
 				descriptor_allocator_set_storage_buffer(rc->dsalloc, 1, (VkDescriptorBufferInfo){ terrainInfo.heightBuffer, 0, VK_WHOLE_SIZE });
+				descriptor_allocator_set_storage_buffer(rc->dsalloc, 2, (VkDescriptorBufferInfo){ terrainInfo.normalBuffer, 0, VK_WHOLE_SIZE });
 				const VkDescriptorSet descriptorSet = descriptor_allocator_end(rc->dsalloc);
 
 				vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->terrainPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 				vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->terrainPipeline);
 				vkCmdBindIndexBuffer(cb, terrainInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-				vkCmdDrawIndexed(cb, terrainInfo.indexCount, 1, 0, 0, 0);
+				vkCmdDrawIndexed(cb, terrainInfo.indexCount, TERRAIN_PATCH_COUNT * TERRAIN_PATCH_COUNT, 0, 0, 0);
 			}
 			
 			FlushDebugRenderer(
