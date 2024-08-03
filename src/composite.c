@@ -16,7 +16,8 @@ typedef struct composite {
 static int create_composite_pipeline_layout(composite_t* composite, vulkan_t* vulkan)
 {
 	const VkDescriptorSetLayoutBinding bindings[] = {
-		{ 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT },
+		{ 0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT },
+		{ 1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT },
 	};
 	const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = {
 		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -48,13 +49,13 @@ static int create_composite_pipeline(composite_t* composite, vulkan_t* vulkan)
 			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 			.stage = VK_SHADER_STAGE_VERTEX_BIT,
 			.module = g_shaders.modules[SHADER_COMPOSITE_VERT],
-			.pName = "main",
+			.pName = "vs_main",
 		},
 		{
 			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
 			.module = g_shaders.modules[SHADER_COMPOSITE_FRAG],
-			.pName = "main",
+			.pName = "fs_main",
 		},
 	};
 
@@ -175,7 +176,8 @@ void draw_composite(
 	VkImageView backbuffer)
 {
 	descriptor_allocator_begin(dsalloc, composite->descriptorSetLayout, "Composite");
-	descriptor_allocator_set_combined_image_sampler(dsalloc, 0, (VkDescriptorImageInfo){ .sampler = vulkan->pointClampSampler, .imageView = rt->sceneColor.view, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+	descriptor_allocator_set_sampled_image(dsalloc, 0, (VkDescriptorImageInfo){ .imageView = rt->sceneColor.view, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+	descriptor_allocator_set_sampler(dsalloc, 1, vulkan->pointClampSampler);
 	VkDescriptorSet descriptorSet = descriptor_allocator_end(dsalloc);
 
 	const VkRenderingAttachmentInfo colorAttachments[] = {
@@ -185,7 +187,8 @@ void draw_composite(
 			.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-		}};
+		},
+	};
 
 	const VkRenderingInfo renderingInfo = {
 		VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -194,7 +197,8 @@ void draw_composite(
 		.layerCount = 1,
 		.renderArea = {
 			.extent = rt->resolution,
-		}};
+		},
+	};
 
 	vkCmdBeginRendering(cb, &renderingInfo);
 	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, composite->pipelineLayout, 0, 1, &descriptorSet, 0, NULL);

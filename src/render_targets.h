@@ -17,7 +17,6 @@ typedef struct render_targets {
 	VkExtent2D resolution;
 	dedicated_render_target_t sceneDepth;
 	dedicated_render_target_t sceneColor;
-	dedicated_render_target_t spotLightAtlas;
 } render_targets_t;
 
 int AllocateDedicatedRenderTarget2D(

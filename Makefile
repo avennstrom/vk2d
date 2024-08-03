@@ -1,16 +1,13 @@
-TARGET_NAME = rts
+TARGET_NAME = game
 CC = gcc
 C_FILES := $(wildcard src/*.c)
 C_OBJ := $(patsubst src/%.c,obj/%.o,$(C_FILES))
 H_FILES := $(wildcard src/*.h)
 
-SHADER_FILES := $(wildcard shaders/*.vert shaders/*.frag shaders/*.geom shaders/*.comp)
-SHADER_SPV := $(patsubst shaders/%,obj/%.spv,$(SHADER_FILES))
-SHADER_DIS := $(patsubst shaders/%,obj/%.spv.s,$(SHADER_FILES))
-SHADER_OBJ := $(patsubst shaders/%,obj/%.spo,$(SHADER_FILES))
-
+SHADER_OBJ := ${SHADER_OBJ} obj/world.vs.spo obj/world.fs.spo
 SHADER_OBJ := ${SHADER_OBJ} obj/model.vs.spo obj/model.fs.spo
-SHADER_OBJ := ${SHADER_OBJ} obj/terrain.vs.spo obj/terrain.fs.spo
+SHADER_OBJ := ${SHADER_OBJ} obj/debug.vs.spo obj/debug.fs.spo
+SHADER_OBJ := ${SHADER_OBJ} obj/composite.vs.spo obj/composite.fs.spo
 
 .PHONY: shaderc run-converter
 .SECONDARY: $(SHADER_SPV)
@@ -38,7 +35,7 @@ obj/%.spo: obj/%.spv
 shaderc:
 	./compile_shaders.sh
 
-run-converter:
+run-converter: converter
 	./converter
 
 converter: src/converter/main.c src/converter/gltf_parser.c src/converter/glb_parser.c

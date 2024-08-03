@@ -1,3 +1,5 @@
+#if 0
+
 #include "terrain.h"
 #include "../shaders/gpu_types.h"
 #include "common.h"
@@ -270,3 +272,5 @@ bool terrain_get_info(terrain_info_t* info, const terrain_t* terrain)
 	info->normalBuffer	= terrain->normalBuffer;
 	return true;
 }
+
+#endif

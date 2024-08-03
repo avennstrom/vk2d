@@ -19,6 +19,7 @@
 #include "content.h"
 #include "vec.h"
 #include "terrain.h"
+#include "world.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -330,14 +331,16 @@ int main(int argc, char **argv)
 	scene_t* scene = scene_create(&vulkan);
 	composite_t* composite = composite_create(&vulkan);
 	model_loader_t* modelLoader = model_loader_create(&vulkan, &gameResource, &content);
-	terrain_t* terrain = terrain_create(&vulkan);
+	world_t* world = world_create(&vulkan);
+	//terrain_t* terrain = terrain_create(&vulkan);
 
 	staging_memory_allocator_t staging_allocator;
 	ResetStagingMemoryAllocator(&staging_allocator, &vulkan);
 	scene_alloc_staging_mem(&staging_allocator, scene);
 	AllocateDebugRendererStagingMemory(&staging_allocator, &debugRenderer);
 	model_loader_alloc_staging_mem(&staging_allocator, modelLoader);
-	terrain_alloc_staging_mem(&staging_allocator, terrain);
+	//terrain_alloc_staging_mem(&staging_allocator, terrain);
+	world_alloc_staging_mem(&staging_allocator, world);
 
 	staging_memory_allocation_t stagingAllocation;
 	FinalizeStagingMemoryAllocator(&stagingAllocation, &staging_allocator);
@@ -436,18 +439,7 @@ int main(int argc, char **argv)
 		assert(scb != NULL);
 
 		game_render(scb, game);
-
-		{
-			mat4 m = mat_identity();
-			m = mat_rotate_z(m, 3.141592f / -2.0f);
-			m = mat_translate(m, (vec3){0.0f, 1.0f, 0.0f});
-
-			vec4 v = {1.0f, 0.0f, 0.0f, 1.0f};
-			v = mat_mul_vec4(m, v);
-			
-			DrawDebugCross(vec4_xyz(v), 1.0f, 0xffffffff);
-		}
-
+		
 		VkCommandBuffer cb = frame->cb;
 
 		const VkCommandBufferBeginInfo cbBeginInfo = {
@@ -464,11 +456,13 @@ int main(int argc, char **argv)
 			.dsalloc = &dsalloc,
 			.rt = &rt,
 			.modelLoader = modelLoader,
-			.terrain = terrain,
+			//.terrain = terrain,
+			.world = world,
 		};
 
 		model_loader_update(cb, modelLoader, &rc);
-		terrain_update(cb, terrain, &rc);
+		//terrain_update(cb, terrain, &rc);
+		world_update(world, cb, &rc);
 
 		{
 			const VkMemoryBarrier memoryBarriers[] = {
@@ -661,7 +655,8 @@ int main(int argc, char **argv)
 		DeinitFrame(&app.frames[i], &vulkan);
 	}
 
-	terrain_destroy(terrain);
+	world_destroy(world);
+	//terrain_destroy(terrain);
 	model_loader_destroy(modelLoader);
 	debug_renderer_destroy(&debugRenderer, &vulkan);
 	scene_destroy(scene);

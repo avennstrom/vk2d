@@ -225,13 +225,13 @@ static int CreateDebugPipeline(
 			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 			.stage = VK_SHADER_STAGE_VERTEX_BIT,
 			.module = g_shaders.modules[SHADER_DEBUG_VERT],
-			.pName = "main",
+			.pName = "vs_main",
 		},
 		{
 			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
 			.module = g_shaders.modules[SHADER_DEBUG_FRAG],
-			.pName = "main",
+			.pName = "fs_main",
 		},
 	};
 

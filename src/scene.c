@@ -5,6 +5,7 @@
 #include "mat.h"
 #include "color.h"
 #include "terrain.h"
+#include "world.h"
 
 #include <memory.h>
 #include <stdbool.h>
@@ -23,7 +24,6 @@ enum scb_command
 	SCB_CMD_NULL = 0,
 	SCB_CMD_DRAW_MODEL,
 	SCB_CMD_POINT_LIGHT,
-	SCB_CMD_SPOT_LIGHT,
 };
 
 typedef struct scb_command_header
@@ -46,10 +46,6 @@ typedef struct scene_frame
 	gpu_frame_uniforms_t*			uniforms;
 	VkBuffer						drawBuffer;
 	gpu_draw_t*						draws;
-	VkBuffer						lightBuffer;
-	gpu_light_buffer_t*				lights;
-	VkBuffer						spotShadowDrawBuffer;
-	VkDrawIndirectCommand*			spotShadowDraws;
 } scene_frame_t;
 
 typedef struct scene
@@ -69,9 +65,13 @@ typedef struct scene
 	VkPipelineLayout		modelPipelineLayout;
 	VkPipeline				modelPipeline;
 
-	VkDescriptorSetLayout	terrainDescriptorSetLayout;
-	VkPipelineLayout		terrainPipelineLayout;
-	VkPipeline				terrainPipeline;
+	VkDescriptorSetLayout	worldDescriptorSetLayout;
+	VkPipelineLayout		worldPipelineLayout;
+	VkPipeline				worldPipeline;
+
+	// VkDescriptorSetLayout	terrainDescriptorSetLayout;
+	// VkPipelineLayout		terrainPipelineLayout;
+	// VkPipeline				terrainPipeline;
 
 	scene_frame_t	frames[FRAME_COUNT];
 } scene_t;
@@ -209,6 +209,140 @@ static int scene_create_model_pipeline(scene_t* scene, vulkan_t* vulkan)
 	SetPipelineName(vulkan, scene->modelPipeline, "Model");
 }
 
+static int scene_create_world_pipeline(scene_t* scene, vulkan_t* vulkan)
+{
+	const VkDescriptorSetLayoutBinding bindings[] = {
+		{ 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
+		{ 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
+		{ 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
+	};
+	const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = {
+		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.bindingCount = countof(bindings),
+		.pBindings = bindings,
+	};
+	if (vkCreateDescriptorSetLayout(vulkan->device, &descriptorSetLayoutInfo, NULL, &scene->worldDescriptorSetLayout) != VK_SUCCESS) {
+		return 1;
+	}
+	SetDescriptorSetLayoutName(vulkan, scene->worldDescriptorSetLayout, "World");
+
+	const VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+		VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.setLayoutCount = 1,
+		.pSetLayouts = &scene->worldDescriptorSetLayout,
+	};
+	if (vkCreatePipelineLayout(vulkan->device, &pipelineLayoutInfo, NULL, &scene->worldPipelineLayout) != VK_SUCCESS) {
+		return 1;
+	}
+	SetPipelineLayoutName(vulkan, scene->worldPipelineLayout, "World");
+	
+	const VkPipelineShaderStageCreateInfo stages[] = {
+		{
+			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_VERTEX_BIT,
+			.module = g_shaders.modules[SHADER_WORLD_VERT],
+			.pName = "vs_main",
+		},
+		{
+			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.module = g_shaders.modules[SHADER_WORLD_FRAG],
+			.pName = "fs_main",
+		},
+	};
+
+	const VkPipelineVertexInputStateCreateInfo vertexInput = {
+		VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+	};
+
+	const VkPipelineInputAssemblyStateCreateInfo inputAssembler = {
+		VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+	};
+
+	const VkPipelineRasterizationStateCreateInfo rasterizer = {
+		VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.cullMode = VK_CULL_MODE_NONE,
+		.lineWidth = 1.0f,
+	};
+
+	const VkPipelineMultisampleStateCreateInfo multisampling = {
+		VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+	};
+
+	const VkPipelineColorBlendAttachmentState blendAttachments[] = {
+		{
+			.blendEnable = VK_TRUE,
+			.colorBlendOp = VK_BLEND_OP_ADD,
+			.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+			.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT,
+		},
+	};
+
+	const VkPipelineColorBlendStateCreateInfo colorBlending = {
+		VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		.attachmentCount = 1,
+		.pAttachments = blendAttachments,
+	};
+
+	const VkPipelineViewportStateCreateInfo viewportState = {
+		VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+		.viewportCount = 1,
+		.scissorCount = 1,
+	};
+
+	const VkDynamicState dynamicStates[] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR,
+	};
+	
+	const VkPipelineDynamicStateCreateInfo dynamicState = {
+		VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.dynamicStateCount = countof(dynamicStates),
+		.pDynamicStates = dynamicStates,
+	};
+
+	const VkPipelineDepthStencilStateCreateInfo depthStencilState = {
+		VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable = VK_TRUE,
+		.depthWriteEnable = VK_TRUE,
+		.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+	};
+
+	const VkFormat colorFormats[] = { SCENE_COLOR_FORMAT };
+	const VkPipelineRenderingCreateInfo renderingInfo = {
+		VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+		.colorAttachmentCount = countof(colorFormats),
+		.pColorAttachmentFormats = colorFormats,
+		.depthAttachmentFormat = SCENE_DEPTH_FORMAT,
+	};
+
+	const VkGraphicsPipelineCreateInfo createInfo = {
+		VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+		.pNext = &renderingInfo,
+		.stageCount = countof(stages),
+		.pStages = stages,
+		.layout = scene->worldPipelineLayout,
+		.pVertexInputState = &vertexInput,
+		.pInputAssemblyState = &inputAssembler,
+		.pRasterizationState = &rasterizer,
+		.pMultisampleState = &multisampling,
+		.pColorBlendState = &colorBlending,
+		.pViewportState = &viewportState,
+		.pDynamicState = &dynamicState,
+		.pDepthStencilState = &depthStencilState,
+	};
+
+	if (vkCreateGraphicsPipelines(vulkan->device, NULL, 1, &createInfo, NULL, &scene->worldPipeline) != VK_SUCCESS) {
+		fprintf(stderr, "vkCreateGraphicsPipelines failed\n");
+		return 1;
+	}
+	SetPipelineName(vulkan, scene->worldPipeline, "World");
+}
+
+#if 0
 static int scene_create_terrain_pipeline(scene_t* scene, vulkan_t* vulkan)
 {
 	const VkDescriptorSetLayoutBinding bindings[] = {
@@ -341,6 +475,7 @@ static int scene_create_terrain_pipeline(scene_t* scene, vulkan_t* vulkan)
 	}
 	SetPipelineName(vulkan, scene->terrainPipeline, "Terrain");
 }
+#endif
 
 int scene_alloc_staging_mem(staging_memory_allocator_t* allocator, scene_t *scene)
 {
@@ -351,8 +486,6 @@ int scene_alloc_staging_mem(staging_memory_allocator_t* allocator, scene_t *scen
 		PushStagingBufferAllocation(allocator, &frame->uniformBuffer, (void**)&frame->uniforms, sizeof(gpu_frame_uniforms_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, "Scene Uniforms");
 		PushStagingBufferAllocation(allocator, &frame->drawBuffer, (void**)&frame->draws, MAX_DRAWS * sizeof(gpu_draw_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, "Draws");
 		//PushStagingBufferAllocation(allocator, &frame->drawCommandBuffer, (void**)&frame->drawCommands, MAX_DRAWS * sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, "Draw Commands");
-		PushStagingBufferAllocation(allocator, &frame->lightBuffer, (void**)&frame->lights, sizeof(gpu_light_buffer_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, "Lights");
-		PushStagingBufferAllocation(allocator, &frame->spotShadowDrawBuffer, (void**)&frame->spotShadowDraws, MAX_SPOT_LIGHTS * sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, "SpotDraws");
 	}
 
 	return 0;
@@ -375,8 +508,10 @@ scene_t *scene_create(vulkan_t *vulkan)
 
 	r = scene_create_model_pipeline(scene, vulkan);
 	assert(r == 0);
-	r = scene_create_terrain_pipeline(scene, vulkan);
+	r = scene_create_world_pipeline(scene, vulkan);
 	assert(r == 0);
+	// r = scene_create_terrain_pipeline(scene, vulkan);
+	// assert(r == 0);
 
 	//scene->vertexBuffer = CreateBuffer(&scene->vertexBufferMemory, vulkan, 1024 * 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
@@ -391,8 +526,6 @@ void scene_destroy(scene_t *scene)
 	{
 		vkDestroyBuffer(vulkan->device, scene->frames[i].uniformBuffer, NULL);
 		vkDestroyBuffer(vulkan->device, scene->frames[i].drawBuffer, NULL);
-		vkDestroyBuffer(vulkan->device, scene->frames[i].lightBuffer, NULL);
-		vkDestroyBuffer(vulkan->device, scene->frames[i].spotShadowDrawBuffer, NULL);
 	}
 	vkFreeMemory(vulkan->device, scene->stagingMemory, NULL);
 
@@ -400,9 +533,15 @@ void scene_destroy(scene_t *scene)
 	vkDestroyPipelineLayout(vulkan->device, scene->modelPipelineLayout, NULL);
 	vkDestroyDescriptorSetLayout(vulkan->device, scene->modelDescriptorSetLayout, NULL);
 
+	vkDestroyPipeline(vulkan->device, scene->worldPipeline, NULL);
+	vkDestroyPipelineLayout(vulkan->device, scene->worldPipelineLayout, NULL);
+	vkDestroyDescriptorSetLayout(vulkan->device, scene->worldDescriptorSetLayout, NULL);
+
+#if 0
 	vkDestroyPipeline(vulkan->device, scene->terrainPipeline, NULL);
 	vkDestroyPipelineLayout(vulkan->device, scene->terrainPipelineLayout, NULL);
 	vkDestroyDescriptorSetLayout(vulkan->device, scene->terrainDescriptorSetLayout, NULL);
+#endif
 
 	free(scene->scb.buf);
 	free(scene);
@@ -458,11 +597,6 @@ scb_point_light_t *scb_add_point_lights(scb_t *scb, size_t count)
 	return (scb_point_light_t *)scb_append(scb, count, SCB_CMD_POINT_LIGHT, sizeof(scb_point_light_t));
 }
 
-scb_spot_light_t *scb_add_spot_lights(scb_t *scb, size_t count)
-{
-	return (scb_spot_light_t *)scb_append(scb, count, SCB_CMD_SPOT_LIGHT, sizeof(scb_spot_light_t));
-}
-
 void scene_draw(
 	VkCommandBuffer cb,
 	scene_t* scene,
@@ -491,10 +625,7 @@ void scene_draw(
 		void *data = ptr + sizeof(scb_command_header_t);
 		size_t cmdsize = 0;
 
-		gpu_point_light_t* gpuPointLights = frame->lights->pointLights;
-		gpu_spot_light_t* gpuSpotLights = frame->lights->spotLights;
 		gpu_draw_t* gpuDraws = frame->draws;
-		mat4* spotLightMatrices = frame->lights->spotLightMatrices;
 
 		switch (header->command)
 		{
@@ -506,57 +637,33 @@ void scene_draw(
 				model_info_t modelInfo;
 				if (model_loader_get_model_info(&modelInfo, rc->modelLoader, draws[i].model))
 				{
-					for (int partIndex = 0; partIndex < modelInfo.partCount; ++partIndex)
-					{
-						const model_part_info_t* partInfo = &modelInfo.parts[partIndex];
-						gpuDraws[gpuDrawCount++] = (gpu_draw_t){
-							.indexCount = partInfo->indexCount,
-							.instanceCount = 1,
-							.firstIndex = partInfo->indexOffset,
-							.vertexPositionOffset = partInfo->vertexPositionOffset,
-							.vertexNormalOffset = partInfo->vertexNormalOffset,
-							.vertexColorOffset = partInfo->vertexColorOffset,
-							.transform = draws[i].transform[partIndex],
-						};
-					}
+					// for (int partIndex = 0; partIndex < modelInfo.partCount; ++partIndex)
+					// {
+					// 	const model_part_info_t* partInfo = &modelInfo.parts[partIndex];
+					// 	gpuDraws[gpuDrawCount++] = (gpu_draw_t){
+					// 		.indexCount = partInfo->indexCount,
+					// 		.instanceCount = 1,
+					// 		.firstIndex = partInfo->indexOffset,
+					// 		.vertexPositionOffset = partInfo->vertexPositionOffset,
+					// 		.vertexNormalOffset = partInfo->vertexNormalOffset,
+					// 		.vertexColorOffset = partInfo->vertexColorOffset,
+					// 		.transform = draws[i].transform[partIndex],
+					// 	};
+					// }
 				}
 			}
 			break;
 		case SCB_CMD_POINT_LIGHT:
 			cmdsize = sizeof(scb_point_light_t);
-			scb_point_light_t *pointLights = (scb_point_light_t *)data;
-			for (size_t i = 0; i < header->count; ++i)
-			{
-				gpuPointLights[gpuPointLightCount++] = (gpu_point_light_t){
-					.pos = pointLights[i].position,
-					.radius = pointLights[i].radius,
-					.color = pointLights[i].color,
-				};
-			}
-			break;
-		case SCB_CMD_SPOT_LIGHT:
-			cmdsize = sizeof(scb_spot_light_t);
-			scb_spot_light_t *spotLights = (scb_spot_light_t *)data;
-			for (size_t i = 0; i < header->count; ++i)
-			{
-				scb_spot_light_t *spotLight = spotLights + i;
-
-				mat4 viewMatrix = mat_invert(spotLight->transform);
-				mat4 projectionMatrix = mat_perspective(spotLight->radius, 1.0f, 0.1f, spotLight->range);
-				mat4 viewProjectionMatrix = mat_mul(viewMatrix, projectionMatrix);
-
-				vec3 pos = { spotLight->transform.r3.x, spotLight->transform.r3.y, spotLight->transform.r3.z };
-
-				spotLightMatrices[gpuSpotLightCount] = mat_transpose(viewProjectionMatrix);
-
-				gpuSpotLights[gpuSpotLightCount] = (gpu_spot_light_t){
-					.pos = pos,
-					.range = spotLight->range,
-					.color = spotLight->color,
-				};
-
-				++gpuSpotLightCount;
-			}
+			// scb_point_light_t *pointLights = (scb_point_light_t *)data;
+			// for (size_t i = 0; i < header->count; ++i)
+			// {
+			// 	gpuPointLights[gpuPointLightCount++] = (gpu_point_light_t){
+			// 		.pos = pointLights[i].position,
+			// 		.radius = pointLights[i].radius,
+			// 		.color = pointLights[i].color,
+			// 	};
+			// }
 			break;
 		}
 
@@ -571,103 +678,14 @@ void scene_draw(
 	};
 
 	PushStagingMemoryFlush(rc->stagingMemory, frame->uniforms, sizeof(gpu_frame_uniforms_t));
-	PushStagingMemoryFlush(rc->stagingMemory, frame->lights, sizeof(gpu_light_buffer_t));
-	PushStagingMemoryFlush(rc->stagingMemory, frame->spotShadowDraws, MAX_SPOT_LIGHTS * sizeof(VkDrawIndirectCommand));
-	PushStagingMemoryFlush(rc->stagingMemory, frame->draws, gpuDrawCount * sizeof(gpu_draw_t));
 
 	const VkDescriptorBufferInfo frameUniformBuffer = {
 		.buffer = frame->uniformBuffer,
 		.range = sizeof(gpu_frame_uniforms_t),
 	};
-	const VkDescriptorBufferInfo lightBuffer = {
-		.buffer = frame->lightBuffer,
-		.range = VK_WHOLE_SIZE,
-	};
-	const VkDescriptorImageInfo spotLightAtlas = {
-		.sampler = rc->vulkan->pointClampSampler,
-		.imageView = rc->rt->spotLightAtlas.view,
-		.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-	};
-
+	
 	{
 		const VkImageMemoryBarrier imageBarriers[] = {
-			{
-				// Spot Light Atlas -> Attachment Write
-				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-				.image = rc->rt->spotLightAtlas.image,
-				.srcAccessMask = VK_ACCESS_NONE,
-				.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-				.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-				.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-				.subresourceRange = {
-					.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-					.layerCount = MAX_SPOT_LIGHTS,
-					.levelCount = 1,
-				},
-			},
-		};
-		vkCmdPipelineBarrier(cb,
-							 VK_PIPELINE_STAGE_NONE,
-							 VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-							 0,
-							 0, NULL,
-							 0, NULL,
-							 countof(imageBarriers), imageBarriers);
-	}
-#if 0
-	{
-		const VkRenderingAttachmentInfo depthAttachment = {
-			VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-			.imageView = rc->rt->spotLightAtlas.view,
-			.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-			.clearValue.depthStencil.depth = 1.0f,
-		};
-		const VkRenderingInfo renderingInfo = {
-			VK_STRUCTURE_TYPE_RENDERING_INFO,
-			.pDepthAttachment = &depthAttachment,
-			.layerCount = gpuSpotLightCount,
-			.renderArea = {
-				.extent = {SPOT_LIGHT_RESOLUTION, SPOT_LIGHT_RESOLUTION},
-			},
-		};
-		vkCmdBeginRendering(cb, &renderingInfo);
-
-		// for (size_t i = 0; i < gpuSpotLightCount; ++i) {
-		// 	frame->spotShadowDraws[i].vertexCount	= worldgenInfo.vertexCount;
-		// 	frame->spotShadowDraws[i].instanceCount	= 1;
-		// 	frame->spotShadowDraws[i].firstVertex	= 0;
-		// 	frame->spotShadowDraws[i].firstInstance	= i;
-		// }
-
-		SetViewportAndScissor(cb, (VkOffset2D){0, 0}, (VkExtent2D){SPOT_LIGHT_RESOLUTION, SPOT_LIGHT_RESOLUTION});
-		
-		// const VkDeviceSize vertexBufferOffset = 0;
-		// vkCmdBindVertexBuffers(cb, 0, 1, &worldgenInfo.vertexBuffer, &vertexBufferOffset);
-		// vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, worldgenInfo.pipelineLayout, 0, 1, &worldDescriptorSet, 0, NULL);
-		// vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, worldgenInfo.shadowPipeline);
-		// vkCmdDrawIndirect(cb, frame->spotShadowDrawBuffer, 0, gpuSpotLightCount, sizeof(VkDrawIndirectCommand));
-
-		vkCmdEndRendering(cb);
-	}
-#endif
-	{
-		const VkImageMemoryBarrier imageBarriers[] = {
-			{
-				// Spot Light Atlas -> Shader Read
-				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-				.image = rc->rt->spotLightAtlas.image,
-				.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-				.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-				.oldLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-				.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				.subresourceRange = {
-					.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-					.layerCount = MAX_SPOT_LIGHTS,
-					.levelCount = 1,
-				},
-			},
 			{
 				// Scene Color -> Attachment Write
 				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -743,20 +761,19 @@ void scene_draw(
 				vkCmdDrawIndexedIndirect(cb, frame->drawBuffer, 0, gpuDrawCount, sizeof(gpu_draw_t));
 			}
 
-
-			terrain_info_t terrainInfo;
-			if (terrain_get_info(&terrainInfo, rc->terrain))
+			world_render_info_t worldInfo;
+			if (world_get_render_info(&worldInfo, rc->world))
 			{
-				descriptor_allocator_begin(rc->dsalloc, scene->terrainDescriptorSetLayout, "SceneTerrain");
+				descriptor_allocator_begin(rc->dsalloc, scene->worldDescriptorSetLayout, "World");
 				descriptor_allocator_set_uniform_buffer(rc->dsalloc, 0, frameUniformBuffer);
-				descriptor_allocator_set_storage_buffer(rc->dsalloc, 1, (VkDescriptorBufferInfo){ terrainInfo.heightBuffer, 0, VK_WHOLE_SIZE });
-				descriptor_allocator_set_storage_buffer(rc->dsalloc, 2, (VkDescriptorBufferInfo){ terrainInfo.normalBuffer, 0, VK_WHOLE_SIZE });
+				descriptor_allocator_set_storage_buffer(rc->dsalloc, 1, (VkDescriptorBufferInfo){ worldInfo.vertexPositionBuffer, 0, VK_WHOLE_SIZE });
+				descriptor_allocator_set_storage_buffer(rc->dsalloc, 2, (VkDescriptorBufferInfo){ worldInfo.vertexColorBuffer, 0, VK_WHOLE_SIZE });
 				const VkDescriptorSet descriptorSet = descriptor_allocator_end(rc->dsalloc);
 
-				vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->terrainPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
-				vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->terrainPipeline);
-				vkCmdBindIndexBuffer(cb, terrainInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-				vkCmdDrawIndexed(cb, terrainInfo.indexCount, TERRAIN_PATCH_COUNT * TERRAIN_PATCH_COUNT, 0, 0, 0);
+				vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->worldPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+				vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->worldPipeline);
+				vkCmdBindIndexBuffer(cb, worldInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+				vkCmdDrawIndexed(cb, worldInfo.indexCount, 1, 0, 0, 0);
 			}
 			
 			FlushDebugRenderer(

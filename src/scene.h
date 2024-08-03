@@ -39,13 +39,6 @@ typedef struct scb_point_light {
 	vec3 color;
 } scb_point_light_t;
 
-typedef struct scb_spot_light {
-	mat4 transform;
-	vec3 color;
-	float range;
-	float radius;
-} scb_spot_light_t;
-
 scb_camera_t* scb_set_camera(
 	scb_t* scb);
 
@@ -57,6 +50,3 @@ scb_point_light_t* scb_add_point_lights(
 	scb_t* scb,
 	size_t count);
 
-scb_spot_light_t *scb_add_spot_lights(
-	scb_t *scb,
-	size_t count);

@@ -178,6 +178,18 @@ bool window_poll(window_event_t* event, window_t* window)
 					.data.button.y = xevent.xbutton.y,
 				};
 			}
+			else if (xevent.xbutton.button == 4) {
+				*event = (window_event_t){
+					WINDOW_EVENT_MOUSE_SCROLL,
+					.data.scroll.delta = 1,
+				};
+			}
+			else if (xevent.xbutton.button == 5) {
+				*event = (window_event_t){
+					WINDOW_EVENT_MOUSE_SCROLL,
+					.data.scroll.delta = -1,
+				};
+			}
 			break;
 		case ButtonRelease:
 			if (xevent.xbutton.button == 1) {

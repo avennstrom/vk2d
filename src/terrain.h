@@ -1,5 +1,7 @@
 #pragma once
 
+#if 0
+
 #include "types.h"
 #include "vulkan.h"
 #include "staging_memory.h"
@@ -22,3 +24,5 @@ typedef struct terrain_info {
 } terrain_info_t;
 
 bool terrain_get_info(terrain_info_t* info, const terrain_t* terrain);
+
+#endif

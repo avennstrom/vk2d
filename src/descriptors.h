@@ -35,4 +35,6 @@ void descriptor_allocator_begin(descriptor_allocator_t* allocator, VkDescriptorS
 void descriptor_allocator_set_uniform_buffer(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorBufferInfo info);
 void descriptor_allocator_set_storage_buffer(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorBufferInfo info);
 void descriptor_allocator_set_combined_image_sampler(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorImageInfo info);
+void descriptor_allocator_set_sampled_image(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorImageInfo info);
+void descriptor_allocator_set_sampler(descriptor_allocator_t* allocator, uint32_t binding, VkSampler sampler);
 VkDescriptorSet descriptor_allocator_end(descriptor_allocator_t* allocator);

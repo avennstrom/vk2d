@@ -153,6 +153,46 @@ void descriptor_allocator_set_combined_image_sampler(descriptor_allocator_t* all
 	};
 }
 
+void descriptor_allocator_set_sampled_image(descriptor_allocator_t* allocator, uint32_t binding, VkDescriptorImageInfo info)
+{
+	assert(allocator->currentSet != VK_NULL_HANDLE);
+
+	VkDescriptorImageInfo* image = &allocator->imageInfos[allocator->imageCount++];
+	VkWriteDescriptorSet* write = &allocator->writes[allocator->writeCount++];
+
+	*image = info;
+	
+	*write = (VkWriteDescriptorSet){
+		VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		.pImageInfo = image,
+		.descriptorCount = 1,
+		.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+		.dstSet = allocator->currentSet,
+		.dstBinding = binding,
+	};
+}
+
+void descriptor_allocator_set_sampler(descriptor_allocator_t* allocator, uint32_t binding, VkSampler sampler)
+{
+	assert(allocator->currentSet != VK_NULL_HANDLE);
+
+	VkDescriptorImageInfo* image = &allocator->imageInfos[allocator->imageCount++];
+	VkWriteDescriptorSet* write = &allocator->writes[allocator->writeCount++];
+
+	*image = (VkDescriptorImageInfo){
+		.sampler = sampler,
+	};
+
+	*write = (VkWriteDescriptorSet){
+		VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		.pImageInfo = image,
+		.descriptorCount = 1,
+		.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+		.dstSet = allocator->currentSet,
+		.dstBinding = binding,
+	};
+}
+
 VkDescriptorSet descriptor_allocator_end(descriptor_allocator_t* allocator)
 {
 	vkUpdateDescriptorSets(allocator->vulkan->device, allocator->writeCount, allocator->writes, 0, NULL);

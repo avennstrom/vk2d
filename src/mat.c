@@ -213,6 +213,19 @@ mat4 mat_perspective(float fovY, float aspect, float near, float far)
 	};
 }
 
+mat4 mat_orthographic(vec2 size, float near, float far)
+{
+	const float sx = 2.0f / size.x;
+	const float sy = 2.0f / size.y;
+	const float d = 2.0f / (far - near);
+	return (mat4){
+		{sx,   0.0f, 0.0f, 0.0f},
+		{0.0f, sy,   0.0f, 0.0f},
+		{0.0f, 0.0f, d,    0.0f},
+		{0.0f, 0.0f, 0.0f, 1.0f},
+	};
+}
+
 vec3 mat_mul_vec3(mat4 m, vec3 v)
 {
 	return (vec3){

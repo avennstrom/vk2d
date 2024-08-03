@@ -37,6 +37,7 @@ enum window_event_type {
 	WINDOW_EVENT_BUTTON_DOWN,
 	WINDOW_EVENT_BUTTON_UP,
 	WINDOW_EVENT_MOUSE_MOVE,
+	WINDOW_EVENT_MOUSE_SCROLL,
 	WINDOW_EVENT_DESTROY,
 };
 
@@ -58,6 +59,10 @@ struct window_event {
 			int x, y;
 			int dx, dy;
 		} mouse;
+
+		struct {
+			int delta;
+		} scroll;
 	} data;
 };
 
