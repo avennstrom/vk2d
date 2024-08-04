@@ -345,7 +345,7 @@ int main(int argc, char **argv)
 	staging_memory_allocation_t stagingAllocation;
 	FinalizeStagingMemoryAllocator(&stagingAllocation, &staging_allocator);
 
-	game_t* game = game_create(window, modelLoader);
+	game_t* game = game_create(window, modelLoader, world);
 
 	delta_timer_t deltaTimer;
 	delta_timer_reset(&deltaTimer);
@@ -416,7 +416,9 @@ int main(int argc, char **argv)
 		//
 		// --- game logic ---
 		//
-		const float deltaTime = (float)delta_timer_capture(&deltaTimer);
+		double deltaTime;
+		double elapsedTime;
+		delta_timer_capture(&deltaTime, &elapsedTime, &deltaTimer);
 
 		const game_viewport_t gameViewport = {
 			.width = resolution.width,
@@ -425,7 +427,7 @@ int main(int argc, char **argv)
 
 		MakeCurrentDebugRenderer(&debugRenderer);
 		
-		game_tick(game, deltaTime, &gameViewport);
+		game_tick(game, (float)deltaTime, &gameViewport);
 
 		//
 		// ---- render ----
@@ -451,6 +453,7 @@ int main(int argc, char **argv)
 		
 		const render_context_t rc = {
 			.frameIndex = app.currentFrame,
+			.elapsedTime = (float)elapsedTime,
 			.vulkan = &vulkan,
 			.stagingMemory = &stagingMemoryContext,
 			.dsalloc = &dsalloc,

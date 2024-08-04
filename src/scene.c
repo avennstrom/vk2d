@@ -675,6 +675,7 @@ void scene_draw(
 		.pointLightCount	= gpuPointLightCount,
 		.spotLightCount		= gpuSpotLightCount,
 		.drawCount			= gpuDrawCount,
+		.elapsedTime		= rc->elapsedTime,
 	};
 
 	PushStagingMemoryFlush(rc->stagingMemory, frame->uniforms, sizeof(gpu_frame_uniforms_t));

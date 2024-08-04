@@ -21,7 +21,6 @@ float3 unpackVertexColor(uint packed)
 	color.r = (packed & 0xffu) / 255.0f;
 	color.g = ((packed >> 8u) & 0xffu) / 255.0f;
 	color.b = ((packed >> 16u) & 0xffu) / 255.0f;
-	//color.a = packed >> 24u;
 	return color;
 }
 
@@ -35,12 +34,20 @@ float3 linearToSrgb(float3 linearColor)
 	return pow(linearColor, 1.0f/2.2f);
 }
 
+float wind(float t)
+{
+	return sin(t * 2.0f) * sin(t * 3.0f) * cos(t * 5.0f) * cos(t * 7.0f);
+}
+
 VsOutput vs_main(VsInput input)
 {
 	VsOutput output = (VsOutput)0;
 
-	const float3	vertexPosition		= g_vertexPositionBuffer.Load<float3>(input.vertexId * sizeof(float3));
-	const uint		vertexColorPacked	= g_vertexColorBuffer.Load(input.vertexId * sizeof(uint));
+	float3			vertexPosition			= g_vertexPositionBuffer.Load<float3>(input.vertexId * sizeof(float3));
+	const uint		vertexColorPacked		= g_vertexColorBuffer.Load(input.vertexId * sizeof(uint));
+	const float		vertexAnimationWeight	= (vertexColorPacked >> 24) / 255.0f;
+	
+	vertexPosition.x += wind(g_frame.elapsedTime * 0.001f * 0.5f + vertexPosition.x * 0.8f) * vertexAnimationWeight * 0.1f;
 
 	output.color	= unpackVertexColor(vertexColorPacked);
 	output.position	= mul(float4(vertexPosition, 1.0), g_frame.matViewProj);

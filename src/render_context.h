@@ -11,6 +11,7 @@ typedef struct world world_t;
 typedef struct render_context
 {
 	uint32_t					frameIndex;
+	float						elapsedTime;
 	vulkan_t*					vulkan;
 	staging_memory_context_t*	stagingMemory;
 	descriptor_allocator_t*		dsalloc;

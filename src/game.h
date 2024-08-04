@@ -2,6 +2,7 @@
 
 #include "window.h"
 #include "scene.h"
+#include "world.h"
 
 typedef struct game game_t;
 
@@ -11,7 +12,7 @@ typedef struct game_viewport
 	uint	height;
 } game_viewport_t;
 
-game_t* game_create(window_t* window, const model_loader_t* modelLoader);
+game_t* game_create(window_t* window, const model_loader_t* modelLoader, world_t* world);
 void game_destroy(game_t* game);
 
 int game_window_event(game_t* game, const window_event_t* event);

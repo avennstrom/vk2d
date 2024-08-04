@@ -45,7 +45,7 @@ struct gpu_frame_uniforms_t
 	uint	drawCount;
 	uint	pointLightCount;
 	uint	spotLightCount;
-	uint	_pad0;
+	float	elapsedTime;
 };
 
 #ifdef __STDC__

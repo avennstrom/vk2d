@@ -4,10 +4,11 @@
 
 void delta_timer_reset(delta_timer_t* timer)
 {
-	clock_gettime(CLOCK_MONOTONIC_RAW, &timer->ts);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &timer->start);
+	timer->ts = timer->start;
 }
 
-double delta_timer_capture(delta_timer_t* timer)
+void delta_timer_capture(double* deltaTime, double* elapsedTime, delta_timer_t* timer)
 {
 	struct timespec now;
 	struct timespec then;
@@ -18,6 +19,8 @@ double delta_timer_capture(delta_timer_t* timer)
 	timer->ts = now;
 
 	long long delta_ns = (now.tv_sec - then.tv_sec) * 1000000000LL + (now.tv_nsec - then.tv_nsec);
+	long long total_ns = (now.tv_sec - timer->start.tv_sec) * 1000000000LL + (now.tv_nsec - timer->start.tv_nsec);
 
-	return delta_ns / 1000000.0;
+	*deltaTime = delta_ns / 1000000.0;
+	*elapsedTime = total_ns / 1000000.0;
 }
