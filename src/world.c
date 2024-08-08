@@ -309,7 +309,7 @@ static void fill_primitive_data(primitive_context_t* ctx)
 		ctx->vertexCount += 6;
 	}
 
-	for (int i = 0; i < 512; ++i)
+	for (int i = 0; i < 256; ++i)
 	{
 		float x = (rand() / (float)RAND_MAX) * 5.0f;
 		grow_plant(ctx, (vec2){x, 0.1f});

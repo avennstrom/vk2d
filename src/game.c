@@ -14,8 +14,10 @@
 #include <stdbool.h>
 #include <float.h>
 
-#define PLAYER_SPEED		0.01f
+#define PLAYER_SPEED		0.008f
 #define PLAYER_SPEED_BOOST	4.0f
+#define PLAYER_GRAVITY		0.00005f
+#define PLAYER_JUMP_VEL		0.015f
 
 typedef struct camera {
 	vec2	pos;
@@ -124,12 +126,6 @@ static void TickPlayerMovement(game_t* game, float deltaTime)
 	float moveX = 0.0f;
 	float moveY = 0.0f;
 	
-	if (game->keystate[KEY_W]) {
-		moveY += 1.0f;
-	}
-	if (game->keystate[KEY_S]) {
-		moveY -= 1.0f;
-	}
 	if (game->keystate[KEY_A]) {
 		moveX -= 1.0f;
 	}
@@ -156,7 +152,7 @@ static void TickPlayerMovement(game_t* game, float deltaTime)
 
 	if (game->keystate[KEY_SPACE] && game->player.isGrounded)
 	{
-		game->player.vel.y = 0.03f;
+		game->player.vel.y = PLAYER_JUMP_VEL;
 	}
 }
 
@@ -204,7 +200,7 @@ void game_tick(game_t* game, float deltaTime, const game_viewport_t* viewport)
 
 		player->isGrounded = false;
 
-		player->vel.y -= 0.0002f * deltaTime;
+		player->vel.y -= PLAYER_GRAVITY * deltaTime;
 		player->pos = vec2_add(player->pos, vec2_scale(player->vel, deltaTime));
 
 		world_collision_info_t worldCollision;
