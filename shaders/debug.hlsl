@@ -18,7 +18,7 @@ struct VsOutput
 VsOutput vs_main(VsInput input)
 {
 	VsOutput output = (VsOutput)0;
-	output.pointSize	= 8.0f;
+	output.pointSize	= 16.0f;
 	output.color		= input.color;
 	output.position		= mul(float4(input.position, 1.0), g_frame.matViewProj);
 	output.position.y	= -output.position.y;

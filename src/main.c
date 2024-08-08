@@ -372,11 +372,6 @@ int main(int argc, char **argv)
 				break;
 			}
 
-			if (event.type == WINDOW_EVENT_KEY_DOWN)
-			{
-				if (event.data.key.code = KEY_F)
-			}
-
 			game_window_event(game, &event);
 		}
 

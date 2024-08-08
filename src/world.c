@@ -1,8 +1,12 @@
 #include "world.h"
 #include "types.h"
 #include "debug_renderer.h"
+#include "vec.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
+#include <assert.h>
 
 #define WORLD_MAX_INDEX_COUNT (16 * 1024)
 #define WORLD_MAX_VERTEX_COUNT (16 * 1024)
@@ -13,13 +17,19 @@
 
 #define WORLD_MAX_TRIANGLE_COLLIDERS 1024
 
+#define POLYGON_MAX_VERTICES 64
+
 typedef enum world_state
 {
 	WORLD_STATE_UPLOAD_TRIANGLES,
 	WORLD_STATE_DONE,
 } world_state_t;
 
-static void triangle_collider_debug_draw(triangle_collider_t* t);
+typedef struct editor_polygon
+{
+	uint	vertexCount;
+	vec2	vertexPosition[POLYGON_MAX_VERTICES];
+} editor_polygon_t;
 
 typedef struct world_colliders
 {
@@ -43,8 +53,18 @@ typedef struct world
 	VkBuffer			stagingBuffer;
 	void*				stagingBufferMemory;
 
+	editor_polygon_t	polygon;
 	world_colliders_t	colliders;
 } world_t;
+
+typedef struct triangle
+{
+	uint32_t i[3];
+} triangle_t;
+
+static void triangle_collider_debug_draw(triangle_collider_t* t);
+static void editor_polygon_debug_draw(editor_polygon_t* p);
+static void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCount, const editor_polygon_t* polygon);
 
 world_t* world_create(vulkan_t* vulkan)
 {
@@ -78,29 +98,37 @@ world_t* world_create(vulkan_t* vulkan)
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	{
+		editor_polygon_t* polygon = &world->polygon;
+		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-5.0f, 1.0f};
+		polygon->vertexPosition[polygon->vertexCount++] = (vec2){0.0f, 0.1f};
+		polygon->vertexPosition[polygon->vertexCount++] = (vec2){5.0f, 0.1f};
+		polygon->vertexPosition[polygon->vertexCount++] = (vec2){10.0f, -0.5f};
+		polygon->vertexPosition[polygon->vertexCount++] = (vec2){5.0f, -1.0f};
+		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-5.0f, -1.0f};
+		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-10.0f, 3.0f};
+	}
+
+	{
 		world_colliders_t* colliders = &world->colliders;
 
-		colliders->triangles[0] = (triangle_collider_t){
-			{0.0f, 0.1f},
-			{5.0f, 0.1f},
-			{0.0f, -1.0f},
-		};
-		colliders->triangles[1] = (triangle_collider_t){
-			{0.0f, -1.0f},
-			{5.0f, 0.1f},
-			{5.0f, -1.0f},
-		};
-		colliders->triangles[2] = (triangle_collider_t){
-			{-5.0f, 1.0f},
-			{0.0f, 0.1f},
-			{0.0f, -1.0f},
-		};
-		colliders->triangles[3] = (triangle_collider_t){
-			{0.0f, -1.0f},
-			{-5.0f, -1.0f},
-			{-5.0f, 1.0f},
-		};
-		colliders->triangleCount = 4;
+		triangle_t triangles[256];
+		size_t triangleCount;
+		editor_polygon_triangulate(triangles, &triangleCount, &world->polygon);
+		
+		for (size_t i = 0; i < triangleCount; ++i)
+		{
+			const uint i0 = triangles[i].i[0];
+			const uint i1 = triangles[i].i[1];
+			const uint i2 = triangles[i].i[2];
+			
+			const vec2 p0 = world->polygon.vertexPosition[i0];
+			const vec2 p1 = world->polygon.vertexPosition[i1];
+			const vec2 p2 = world->polygon.vertexPosition[i2];
+
+			colliders->triangles[i] = (triangle_collider_t){ p0, p1, p2 };
+		}
+
+		colliders->triangleCount = triangleCount;
 	}
 
 	return world;
@@ -144,19 +172,19 @@ typedef struct primitive_context
 	uint32_t	vertexCount;
 } primitive_context_t;
 
-static void grow_grass(primitive_context_t* ctx, vec2 root)
+static void grow_grass(primitive_context_t* ctx, vec2 root, vec2 tangent)
 {
 	ctx->indices[ctx->indexCount + 0] = ctx->vertexCount + 0;
 	ctx->indices[ctx->indexCount + 1] = ctx->vertexCount + 1;
 	ctx->indices[ctx->indexCount + 2] = ctx->vertexCount + 2;
 	ctx->indexCount += 3;
 
-	float width = 0.05f;
+	float width = 0.025f;
 	float height = 0.1f + (rand() / (float)RAND_MAX) * 0.5f;
 
 	ctx->positions[ctx->vertexCount + 0] = (vec3){root.x, root.y + height};
-	ctx->positions[ctx->vertexCount + 1] = (vec3){root.x - width * 0.5f, root.y};
-	ctx->positions[ctx->vertexCount + 2] = (vec3){root.x + width * 0.5f, root.y};
+	ctx->positions[ctx->vertexCount + 1] = (vec3){root.x - width * tangent.x, root.y - width * tangent.y};
+	ctx->positions[ctx->vertexCount + 2] = (vec3){root.x + width * tangent.x, root.y + width * tangent.y};
 
 	uint8_t red = rand() & 0b1111111;
 
@@ -167,9 +195,9 @@ static void grow_grass(primitive_context_t* ctx, vec2 root)
 	ctx->vertexCount += 3;
 }
 
-static void grow_flower(primitive_context_t* ctx, vec2 root)
+static void grow_flower(primitive_context_t* ctx, vec2 root, vec2 tangent)
 {
-	float width = 0.02f;
+	float width = 0.01f;
 	float height = 0.3f + (rand() / (float)RAND_MAX) * 0.5f;
 	float headSize = 0.1f;
 
@@ -183,10 +211,10 @@ static void grow_flower(primitive_context_t* ctx, vec2 root)
 		ctx->indices[ctx->indexCount + 5] = ctx->vertexCount + 3;
 		ctx->indexCount += 6;
 
-		ctx->positions[ctx->vertexCount + 0] = (vec3){root.x - width * 0.5f, root.y + height};
-		ctx->positions[ctx->vertexCount + 1] = (vec3){root.x + width * 0.5f, root.y + height};
-		ctx->positions[ctx->vertexCount + 2] = (vec3){root.x - width * 0.5f, root.y};
-		ctx->positions[ctx->vertexCount + 3] = (vec3){root.x + width * 0.5f, root.y};
+		ctx->positions[ctx->vertexCount + 0] = (vec3){root.x - width, root.y + height};
+		ctx->positions[ctx->vertexCount + 1] = (vec3){root.x + width, root.y + height};
+		ctx->positions[ctx->vertexCount + 2] = (vec3){root.x - width * tangent.x, root.y - width * tangent.y};
+		ctx->positions[ctx->vertexCount + 3] = (vec3){root.x + width * tangent.x, root.y + width * tangent.y};
 
 		uint8_t red = rand() & 0b11111;
 
@@ -229,90 +257,70 @@ static void grow_flower(primitive_context_t* ctx, vec2 root)
 	}
 }
 
-static void grow_plant(primitive_context_t* ctx, vec2 root)
+static void grow_plant(primitive_context_t* ctx, vec2 root, vec2 tangent)
 {
 	const int type = rand() % 2;
 	if (type == 0)
 	{
-		grow_grass(ctx, root);
+		grow_grass(ctx, root, tangent);
 	}
 	else if (type == 1)
 	{
-		grow_flower(ctx, root);
+		grow_flower(ctx, root, tangent);
 	}
 }
 
-static void fill_primitive_data(primitive_context_t* ctx)
+static void fill_primitive_data(primitive_context_t* ctx, const editor_polygon_t* polygon)
 {
+	triangle_t triangles[256];
+	size_t triangleCount;
+	editor_polygon_triangulate(triangles, &triangleCount, polygon);
+
+	for (size_t i = 0; i < triangleCount; ++i)
 	{
-		ctx->indices[ctx->indexCount + 0] = ctx->vertexCount + 0;
-		ctx->indices[ctx->indexCount + 1] = ctx->vertexCount + 1;
-		ctx->indices[ctx->indexCount + 2] = ctx->vertexCount + 2;
-		ctx->indices[ctx->indexCount + 3] = ctx->vertexCount + 2;
-		ctx->indices[ctx->indexCount + 4] = ctx->vertexCount + 1;
-		ctx->indices[ctx->indexCount + 5] = ctx->vertexCount + 3;
-		ctx->indexCount += 6;
+		const triangle_t* triangle = &triangles[i];
 
-		ctx->indices[ctx->indexCount + 0] = ctx->vertexCount + 2;
-		ctx->indices[ctx->indexCount + 1] = ctx->vertexCount + 3;
-		ctx->indices[ctx->indexCount + 2] = ctx->vertexCount + 4;
-		ctx->indices[ctx->indexCount + 3] = ctx->vertexCount + 4;
-		ctx->indices[ctx->indexCount + 4] = ctx->vertexCount + 3;
-		ctx->indices[ctx->indexCount + 5] = ctx->vertexCount + 5;
-		ctx->indexCount += 6;
-		
-		ctx->positions[ctx->vertexCount + 0] = (vec3){0.0f, 0.1f};
-		ctx->positions[ctx->vertexCount + 1] = (vec3){5.0f, 0.1f};
-		ctx->positions[ctx->vertexCount + 2] = (vec3){0.0f, 0.0f};
-		ctx->positions[ctx->vertexCount + 3] = (vec3){5.0f, 0.0f};
-		ctx->positions[ctx->vertexCount + 4] = (vec3){0.0f, -1.0f};
-		ctx->positions[ctx->vertexCount + 5] = (vec3){5.0f, -1.0f};
-
-		ctx->colors[ctx->vertexCount + 0] = 0x00a000;
-		ctx->colors[ctx->vertexCount + 1] = 0x00a000;
-		ctx->colors[ctx->vertexCount + 2] = 0x001020;
-		ctx->colors[ctx->vertexCount + 3] = 0x001020;
-		ctx->colors[ctx->vertexCount + 4] = 0x000a10;
-		ctx->colors[ctx->vertexCount + 5] = 0x000a10;
-		ctx->vertexCount += 6;
-	}
-	{
-		ctx->indices[ctx->indexCount + 0] = ctx->vertexCount + 0;
-		ctx->indices[ctx->indexCount + 1] = ctx->vertexCount + 1;
-		ctx->indices[ctx->indexCount + 2] = ctx->vertexCount + 2;
-		ctx->indices[ctx->indexCount + 3] = ctx->vertexCount + 2;
-		ctx->indices[ctx->indexCount + 4] = ctx->vertexCount + 1;
-		ctx->indices[ctx->indexCount + 5] = ctx->vertexCount + 3;
-		ctx->indexCount += 6;
-
-		ctx->indices[ctx->indexCount + 0] = ctx->vertexCount + 2;
-		ctx->indices[ctx->indexCount + 1] = ctx->vertexCount + 3;
-		ctx->indices[ctx->indexCount + 2] = ctx->vertexCount + 4;
-		ctx->indices[ctx->indexCount + 3] = ctx->vertexCount + 4;
-		ctx->indices[ctx->indexCount + 4] = ctx->vertexCount + 3;
-		ctx->indices[ctx->indexCount + 5] = ctx->vertexCount + 5;
-		ctx->indexCount += 6;
-		
-		ctx->positions[ctx->vertexCount + 0] = (vec3){-5.0f, 1.0f};
-		ctx->positions[ctx->vertexCount + 1] = (vec3){ 0.0f, 0.1f};
-		ctx->positions[ctx->vertexCount + 2] = (vec3){-5.0f, 0.9f};
-		ctx->positions[ctx->vertexCount + 3] = (vec3){ 0.0f, 0.0f};
-		ctx->positions[ctx->vertexCount + 4] = (vec3){-5.0f, -1.0f};
-		ctx->positions[ctx->vertexCount + 5] = (vec3){ 0.0f, -1.0f};
-
-		ctx->colors[ctx->vertexCount + 0] = 0x00a000;
-		ctx->colors[ctx->vertexCount + 1] = 0x00a000;
-		ctx->colors[ctx->vertexCount + 2] = 0x001020;
-		ctx->colors[ctx->vertexCount + 3] = 0x001020;
-		ctx->colors[ctx->vertexCount + 4] = 0x000a10;
-		ctx->colors[ctx->vertexCount + 5] = 0x000a10;
-		ctx->vertexCount += 6;
+		ctx->indices[ctx->indexCount + 0] = triangle->i[0] + ctx->vertexCount;
+		ctx->indices[ctx->indexCount + 1] = triangle->i[1] + ctx->vertexCount;
+		ctx->indices[ctx->indexCount + 2] = triangle->i[2] + ctx->vertexCount;
+		ctx->indexCount += 3;
 	}
 
-	for (int i = 0; i < 256; ++i)
+	for (size_t i = 0; i < polygon->vertexCount; ++i)
 	{
-		float x = (rand() / (float)RAND_MAX) * 5.0f;
-		grow_plant(ctx, (vec2){x, 0.1f});
+		const vec2 p = polygon->vertexPosition[i];
+		ctx->positions[ctx->vertexCount + i] = (vec3){ p.x, p.y };
+		ctx->colors[ctx->vertexCount + i] = 0x001020;
+	}
+
+	ctx->vertexCount += polygon->vertexCount;
+
+	for (uint i = 0; i < polygon->vertexCount; ++i)
+	{
+		const uint j = (i + 1) % polygon->vertexCount;
+
+		const vec2 p0 = polygon->vertexPosition[i];
+		const vec2 p1 = polygon->vertexPosition[j];
+
+		const vec2 d = vec2_normalize(vec2_sub(p1, p0));
+		const vec2 n = {-d.y, d.x};
+		
+		if (n.y <= 0.0f)
+		{
+			continue;
+		}
+
+		const float len = vec2_length(vec2_sub(p1, p0));
+		const float plantDensity = 40.0f;
+
+		const int plantCount = len * plantDensity;
+		
+		for (int i = 0; i < plantCount; ++i)
+		{
+			const float t = (rand() / (float)RAND_MAX);
+			const vec2 p = vec2_lerp(p0, p1, t);
+			grow_plant(ctx, p, d);
+		}
 	}
 }
 
@@ -332,7 +340,9 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 				.colors = stagingColors,
 			};
 
-			fill_primitive_data(&ctx);
+			fill_primitive_data(&ctx, &world->polygon);
+
+			printf("World triangles: %u, vertices: %u\n", ctx.indexCount / 3u, ctx.vertexCount);
 
 			world->indexCount = ctx.indexCount;
 			
@@ -369,11 +379,15 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 		}
 	}
 	
-#if 0
+#if 1
 	for (size_t i = 0; i < world->colliders.triangleCount; ++i)
 	{
 		triangle_collider_debug_draw(&world->colliders.triangles[i]);
 	}
+#endif
+
+#if 0
+	editor_polygon_debug_draw(&world->polygon);
 #endif
 }
 
@@ -407,4 +421,113 @@ static void triangle_collider_debug_draw(triangle_collider_t* t)
 	DrawDebugLine(v0, v1);
 	DrawDebugLine(v1, v2);
 	DrawDebugLine(v2, v0);
+}
+
+static void editor_polygon_debug_draw(editor_polygon_t* p)
+{
+	for (size_t i = 0; i < p->vertexCount; ++i)
+	{
+		const size_t j = (i + 1) % p->vertexCount;
+
+		const vec2 p0 = p->vertexPosition[i];
+		const vec2 p1 = p->vertexPosition[j];
+
+		const debug_vertex_t v0 = { .x = p0.x, .y = p0.y, .color = 0xffffffff };
+		const debug_vertex_t v1 = { .x = p1.x, .y = p1.y, .color = 0xffffffff };
+		DrawDebugLine(v0, v1);
+	}
+
+	for (size_t i = 0; i < p->vertexCount; ++i)
+	{
+		const size_t j = (i + 1) % p->vertexCount;
+		const size_t k = (i + 2) % p->vertexCount;
+		
+		const vec2 p0 = p->vertexPosition[i];
+		const vec2 p1 = p->vertexPosition[j];
+		const vec2 p2 = p->vertexPosition[k];
+		
+		const vec2 d0 = vec2_normalize(vec2_sub(p1, p0));
+		const vec2 d1 = vec2_normalize(vec2_sub(p2, p1));
+
+		const float a0 = atan2f(d0.y, d0.x);
+		const float a1 = atan2f(d1.y, d1.x);
+
+		float da = a1 - a0;
+		da = atan2f(sin(da), cos(da));
+
+		const bool isConvex = da < 0.0f;
+		
+		DrawDebugPoint((debug_vertex_t){ .x = p1.x, .y = p1.y, .color = isConvex ? 0xff00ff00 : 0xff0000ff });
+	}
+}
+
+// https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf
+static void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCount, const editor_polygon_t* p)
+{
+	*triangleCount = 0;
+
+	uint workingSet[POLYGON_MAX_VERTICES];
+	uint workingSetSize = p->vertexCount;
+
+	for (size_t i = 0; i < p->vertexCount; ++i)
+	{
+		workingSet[i] = i;
+	}
+
+	while (workingSetSize >= 3)
+	{
+		for (size_t i = 0; i < workingSetSize; ++i)
+		{
+			const size_t j = (i + 1) % workingSetSize;
+			const size_t k = (i + 2) % workingSetSize;
+			
+			const uint i0 = workingSet[i];
+			const uint i1 = workingSet[j];
+			const uint i2 = workingSet[k];
+			
+			const vec2 p0 = p->vertexPosition[i0];
+			const vec2 p1 = p->vertexPosition[i1];
+			const vec2 p2 = p->vertexPosition[i2];
+
+			const vec2 d0 = vec2_normalize(vec2_sub(p1, p0));
+			const vec2 d1 = vec2_normalize(vec2_sub(p2, p1));
+
+			const float a0 = atan2f(d0.y, d0.x);
+			const float a1 = atan2f(d1.y, d1.x);
+
+			float da = a1 - a0;
+			da = atan2f(sin(da), cos(da));
+
+			const bool isConvex = da < 0.0f;
+
+			if (!isConvex)
+			{
+				continue;
+			}
+
+			// verify clockwise winding
+			const float det = 
+				p0.x * (p1.y - p2.y) + 
+				p1.x * (p2.y - p0.y) + 
+				p2.x * (p0.y - p1.y);
+			assert(det < 0.0f);
+			
+			const bool shouldClip = true;
+			
+			if (shouldClip)
+			{
+				triangle_t* triangle = &triangles[(*triangleCount)++];
+				triangle->i[0] = i0;
+				triangle->i[1] = i1;
+				triangle->i[2] = i2;
+
+				--workingSetSize;
+
+				for (uint del = j; del < workingSetSize; ++del)
+				{
+					workingSet[del] = workingSet[del + 1];
+				}
+			}
+		}
+	}
 }

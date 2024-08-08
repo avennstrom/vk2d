@@ -66,7 +66,7 @@ game_t* game_create(window_t* window, const model_loader_t* modelLoader, world_t
 	game->modelLoader	= modelLoader;
 
 	game->player = (player_t){
-		.pos = {2.0f, 0.0f},
+		.pos = {2.0f, 0.1f},
 		.size = {0.5f, 1.0f},
 	};
 
@@ -234,11 +234,13 @@ void game_tick(game_t* game, float deltaTime, const game_viewport_t* viewport)
 				const vec2 d = vec2_normalize(vec2_sub(b, a));
 				const vec2 normal = {-d.y, d.x};
 				
+#if 0
 				const vec2 center = vec2_scale(vec2_add(a, b), 0.5f);
-				// DrawDebugLine(
-				// 	(debug_vertex_t){.x = center.x, .y = center.y, .color = 0xffff00ff},
-				// 	(debug_vertex_t){.x = center.x + normal.x * 0.3f, .y = center.y + normal.y * 0.3f, .color = 0xffff00ff}
-				// );
+				DrawDebugLine(
+					(debug_vertex_t){.x = center.x, .y = center.y, .color = 0xffff00ff},
+					(debug_vertex_t){.x = center.x + normal.x * 0.3f, .y = center.y + normal.y * 0.3f, .color = 0xffff00ff}
+				);
+#endif
 
 				planes[edgeIndex] = (vec3){ normal.x, normal.y, vec2_dot(normal, a) };
 			}
