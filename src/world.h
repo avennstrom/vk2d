@@ -7,6 +7,8 @@
 
 #include <stdbool.h>
 
+#define POLYGON_MAX_VERTICES 64
+
 typedef struct world world_t;
 
 world_t* world_create(vulkan_t* vulkan);
@@ -40,3 +42,17 @@ typedef struct world_collision_info
 } world_collision_info_t;
 
 void world_get_collision_info(world_collision_info_t* info, world_t* world);
+
+typedef struct editor_polygon
+{
+	uint	vertexCount;
+	vec2	vertexPosition[POLYGON_MAX_VERTICES];
+} editor_polygon_t;
+
+typedef struct world_edit_info
+{
+	uint				polygonCount;
+	editor_polygon_t*	polygons;
+} world_edit_info_t;
+
+void world_get_edit_info(world_edit_info_t* info, world_t* world);

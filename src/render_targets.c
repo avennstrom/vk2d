@@ -7,7 +7,7 @@
 int AllocateDedicatedRenderTarget2D(
 	dedicated_render_target_t *rt,
 	vulkan_t *vulkan,
-	VkExtent2D resolution,
+	uint2 resolution,
 	VkFormat format,
 	VkImageUsageFlags usage,
 	const char* debugName)
@@ -32,8 +32,8 @@ int AllocateDedicatedRenderTarget2D(
 		.imageType = VK_IMAGE_TYPE_2D,
 		.format = format,
 		.extent = {
-			.width = resolution.width,
-			.height = resolution.height,
+			.width = resolution.x,
+			.height = resolution.y,
 			.depth = 1,
 		},
 		.usage = usage,
@@ -82,7 +82,7 @@ void destroy_dedicated_render_target(
 int render_targets_create(
 	render_targets_t *rt,
 	vulkan_t *vulkan,
-	VkExtent2D resolution)
+	uint2 resolution)
 {
 	AllocateDedicatedRenderTarget2D(
 		&rt->sceneColor, 
@@ -111,5 +111,5 @@ void render_targets_destroy(
 	destroy_dedicated_render_target(&rt->sceneColor, vulkan);
 	destroy_dedicated_render_target(&rt->sceneDepth, vulkan);
 
-	rt->resolution = (VkExtent2D){0, 0};
+	rt->resolution = (uint2){0, 0};
 }

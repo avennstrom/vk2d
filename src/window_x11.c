@@ -13,8 +13,7 @@ struct window
 	Window window;
 	int mouseX;
 	int mouseY;
-	int width;
-	int height;
+	uint2 size;
 	
 	int lockX;
 	int lockY;
@@ -40,7 +39,7 @@ static void xlib_io_error_exit_handler(Display*, void*)
 	//printf("X11 IO error exit\n");
 }
 
-window_t* window_create(uint32_t width, uint32_t height)
+window_t* window_create(uint2 size)
 {
 	window_t* window = calloc(1, sizeof(window_t));
 	if (window == NULL) {
@@ -57,13 +56,12 @@ window_t* window_create(uint32_t width, uint32_t height)
 
 	XSetIOErrorExitHandler(window->display, xlib_io_error_exit_handler, NULL);
 
-	window->window = XCreateSimpleWindow(window->display, RootWindow(window->display, 0), 0, 0, width, height, 0, 0, WhitePixel(window->display, 0));
+	window->window = XCreateSimpleWindow(window->display, RootWindow(window->display, 0), 0, 0, size.x, size.y, 0, 0, WhitePixel(window->display, 0));
 
 	XSelectInput(window->display, window->window, ExposureMask | KeyPressMask | KeyReleaseMask | StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask);
 	XMapWindow(window->display, window->window);
 
-	window->width = width;
-	window->height = height;
+	window->size = size;
 
 	XColor black;
 	static char noData[] = { 0,0,0,0,0,0,0,0 };
@@ -154,12 +152,11 @@ bool window_poll(window_event_t* event, window_t* window)
 			};
 			break;
 		case ConfigureNotify:
-			window->width = xevent.xconfigure.width;
-			window->height = xevent.xconfigure.height;
+			window->size.x = xevent.xconfigure.width;
+			window->size.y = xevent.xconfigure.height;
 			*event = (window_event_t){ 
 				WINDOW_EVENT_SIZE, 
-				.data.size.width = xevent.xconfigure.width,
-				.data.size.height = xevent.xconfigure.height,
+				.data.size.size = window->size,
 			};
 			break;
 		case ButtonPress:
@@ -167,16 +164,16 @@ bool window_poll(window_event_t* event, window_t* window)
 				*event = (window_event_t){
 					WINDOW_EVENT_BUTTON_DOWN,
 					.data.button.button = BUTTON_LEFT,
-					.data.button.x = xevent.xbutton.x,
-					.data.button.y = xevent.xbutton.y,
+					.data.button.pos.x = xevent.xbutton.x,
+					.data.button.pos.y = xevent.xbutton.y,
 				};
 			}
 			else if (xevent.xbutton.button == 3) {
 				*event = (window_event_t){
 					WINDOW_EVENT_BUTTON_DOWN,
 					.data.button.button = BUTTON_RIGHT,
-					.data.button.x = xevent.xbutton.x,
-					.data.button.y = xevent.xbutton.y,
+					.data.button.pos.x = xevent.xbutton.x,
+					.data.button.pos.y = xevent.xbutton.y,
 				};
 			}
 			else if (xevent.xbutton.button == 4) {
@@ -197,16 +194,16 @@ bool window_poll(window_event_t* event, window_t* window)
 				*event = (window_event_t){
 					WINDOW_EVENT_BUTTON_UP,
 					.data.button.button = BUTTON_LEFT,
-					.data.button.x = xevent.xbutton.x,
-					.data.button.y = xevent.xbutton.y,
+					.data.button.pos.x = xevent.xbutton.x,
+					.data.button.pos.y = xevent.xbutton.y,
 				};
 			}
 			else if (xevent.xbutton.button == 3) {
 				*event = (window_event_t){
 					WINDOW_EVENT_BUTTON_UP,
 					.data.button.button = BUTTON_RIGHT,
-					.data.button.x = xevent.xbutton.x,
-					.data.button.y = xevent.xbutton.y,
+					.data.button.pos.x = xevent.xbutton.x,
+					.data.button.pos.y = xevent.xbutton.y,
 				};
 			}
 			break;
@@ -222,7 +219,7 @@ bool window_poll(window_event_t* event, window_t* window)
 			if (dx == 0 && dy == 0) {
 				break;
 			}
-			if (window->mouseLock && x == window->width / 2 && y == window->height / 2) {
+			if (window->mouseLock && x == window->size.x / 2 && y == window->size.y / 2) {
 				window->mouseX = x;
 				window->mouseY = y;
 				break;
@@ -232,16 +229,16 @@ bool window_poll(window_event_t* event, window_t* window)
 
 			*event = (window_event_t){
 				WINDOW_EVENT_MOUSE_MOVE,
-				.data.mouse.x = x,
-				.data.mouse.y = y,
-				.data.mouse.dx = dx,
-				.data.mouse.dy = dy,
+				.data.mouse.pos.x = x,
+				.data.mouse.pos.y = y,
+				.data.mouse.delta.x = dx,
+				.data.mouse.delta.y = dy,
 			};
 
 			window->mouseX = x;
 			window->mouseY = y;
 			if (window->mouseLock) {
-				XWarpPointer(window->display, None, window->window, 0, 0, 0, 0, window->width / 2, window->height / 2);
+				XWarpPointer(window->display, None, window->window, 0, 0, 0, 0, window->size.x / 2, window->size.y / 2);
 			}
 			break;
 	}

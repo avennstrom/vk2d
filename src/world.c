@@ -2,6 +2,7 @@
 #include "types.h"
 #include "debug_renderer.h"
 #include "vec.h"
+#include "util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,19 +18,11 @@
 
 #define WORLD_MAX_TRIANGLE_COLLIDERS 1024
 
-#define POLYGON_MAX_VERTICES 64
-
 typedef enum world_state
 {
 	WORLD_STATE_UPLOAD_TRIANGLES,
 	WORLD_STATE_DONE,
 } world_state_t;
-
-typedef struct editor_polygon
-{
-	uint	vertexCount;
-	vec2	vertexPosition[POLYGON_MAX_VERTICES];
-} editor_polygon_t;
 
 typedef struct world_colliders
 {
@@ -99,36 +92,14 @@ world_t* world_create(vulkan_t* vulkan)
 
 	{
 		editor_polygon_t* polygon = &world->polygon;
+
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-5.0f, 1.0f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){0.0f, 0.1f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){5.0f, 0.1f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){10.0f, -0.5f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){5.0f, -1.0f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-5.0f, -1.0f};
-		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-10.0f, 3.0f};
-	}
-
-	{
-		world_colliders_t* colliders = &world->colliders;
-
-		triangle_t triangles[256];
-		size_t triangleCount;
-		editor_polygon_triangulate(triangles, &triangleCount, &world->polygon);
-		
-		for (size_t i = 0; i < triangleCount; ++i)
-		{
-			const uint i0 = triangles[i].i[0];
-			const uint i1 = triangles[i].i[1];
-			const uint i2 = triangles[i].i[2];
-			
-			const vec2 p0 = world->polygon.vertexPosition[i0];
-			const vec2 p1 = world->polygon.vertexPosition[i1];
-			const vec2 p2 = world->polygon.vertexPosition[i2];
-
-			colliders->triangles[i] = (triangle_collider_t){ p0, p1, p2 };
-		}
-
-		colliders->triangleCount = triangleCount;
+		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-10.0f, 0.0f};
 	}
 
 	return world;
@@ -326,6 +297,29 @@ static void fill_primitive_data(primitive_context_t* ctx, const editor_polygon_t
 
 void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc)
 {
+	{
+		world_colliders_t* colliders = &world->colliders;
+
+		triangle_t triangles[256];
+		size_t triangleCount;
+		editor_polygon_triangulate(triangles, &triangleCount, &world->polygon);
+		
+		for (size_t i = 0; i < triangleCount; ++i)
+		{
+			const uint i0 = triangles[i].i[0];
+			const uint i1 = triangles[i].i[1];
+			const uint i2 = triangles[i].i[2];
+			
+			const vec2 p0 = world->polygon.vertexPosition[i0];
+			const vec2 p1 = world->polygon.vertexPosition[i1];
+			const vec2 p2 = world->polygon.vertexPosition[i2];
+
+			colliders->triangles[i] = (triangle_collider_t){ p0, p1, p2 };
+		}
+
+		colliders->triangleCount = triangleCount;
+	}
+
 	switch (world->state)
 	{
 		case WORLD_STATE_UPLOAD_TRIANGLES:
@@ -333,6 +327,8 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 			uint16_t* stagingIndices = (uint16_t*)world->stagingBufferMemory;
 			vec3* stagingPositions = (vec3*)((uint8_t*)world->stagingBufferMemory + WORLD_INDEX_BUFFER_SIZE);
 			uint32_t* stagingColors = (uint32_t*)((uint8_t*)world->stagingBufferMemory + WORLD_INDEX_BUFFER_SIZE + WORLD_POSITION_BUFFER_SIZE);
+
+			srand(1337);
 
 			primitive_context_t ctx = {
 				.indices = stagingIndices,
@@ -342,7 +338,7 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 
 			fill_primitive_data(&ctx, &world->polygon);
 
-			printf("World triangles: %u, vertices: %u\n", ctx.indexCount / 3u, ctx.vertexCount);
+			//printf("World triangles: %u, vertices: %u\n", ctx.indexCount / 3u, ctx.vertexCount);
 
 			world->indexCount = ctx.indexCount;
 			
@@ -369,7 +365,7 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 				vkCmdCopyBuffer(cb, world->stagingBuffer, world->vertexColorBuffer, 1, &copyRegion);
 			}
 
-			world->state = WORLD_STATE_DONE;
+			//world->state = WORLD_STATE_DONE;
 			break;
 		}
 		
@@ -379,7 +375,7 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 		}
 	}
 	
-#if 1
+#if 0
 	for (size_t i = 0; i < world->colliders.triangleCount; ++i)
 	{
 		triangle_collider_debug_draw(&world->colliders.triangles[i]);
@@ -393,10 +389,10 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 
 bool world_get_render_info(world_render_info_t* info, world_t* world)
 {
-	if (world->state != WORLD_STATE_DONE)
-	{
-		return false;
-	}
+	// if (world->state != WORLD_STATE_DONE)
+	// {
+	// 	return false;
+	// }
 
 	info->indexBuffer			= world->indexBuffer;
 	info->vertexPositionBuffer	= world->vertexPositionBuffer;
@@ -410,6 +406,12 @@ void world_get_collision_info(world_collision_info_t* info, world_t* world)
 {
 	info->triangleCount	= world->colliders.triangleCount;
 	info->triangles		= world->colliders.triangles;
+}
+
+void world_get_edit_info(world_edit_info_t* info, world_t* world)
+{
+	info->polygonCount	= 1;
+	info->polygons		= &world->polygon;
 }
 
 static void triangle_collider_debug_draw(triangle_collider_t* t)
@@ -474,10 +476,14 @@ static void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCo
 		workingSet[i] = i;
 	}
 
-	while (workingSetSize >= 3)
+	while (workingSetSize > 3)
 	{
-		for (size_t i = 0; i < workingSetSize; ++i)
+		//printf("outer: %u\n", workingSetSize);
+
+		for (size_t i = 0; i < workingSetSize && workingSetSize > 3; ++i)
 		{
+			//printf("inner: %u\n", i);
+
 			const size_t j = (i + 1) % workingSetSize;
 			const size_t k = (i + 2) % workingSetSize;
 			
@@ -502,6 +508,7 @@ static void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCo
 
 			if (!isConvex)
 			{
+				//printf("not convex\n");
 				continue;
 			}
 
@@ -510,9 +517,50 @@ static void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCo
 				p0.x * (p1.y - p2.y) + 
 				p1.x * (p2.y - p0.y) + 
 				p2.x * (p0.y - p1.y);
-			assert(det < 0.0f);
+			assert(det <= 0.0f);
+
+			const vec2 edges[][2] = {
+				{p0, p1},
+				{p1, p2},
+				{p2, p0},
+			};
 			
-			const bool shouldClip = true;
+			vec3 planes[3];
+			for (size_t edgeIndex = 0; edgeIndex < countof(edges); ++edgeIndex)
+			{
+				const vec2 a = edges[edgeIndex][0];
+				const vec2 b = edges[edgeIndex][1];
+				const vec2 d = vec2_normalize(vec2_sub(b, a));
+				const vec2 normal = {-d.y, d.x};
+				
+#if 0
+				const vec2 center = vec2_scale(vec2_add(a, b), 0.5f);
+				DrawDebugLine(
+					(debug_vertex_t){.x = center.x, .y = center.y, .color = 0xffff00ff},
+					(debug_vertex_t){.x = center.x + normal.x * 0.3f, .y = center.y + normal.y * 0.3f, .color = 0xffff00ff}
+				);
+#endif
+
+				planes[edgeIndex] = (vec3){ normal.x, normal.y, vec2_dot(normal, a) };
+			}
+			
+			bool shouldClip = true;
+
+			//printf("workingSetSize: %u\n", workingSetSize);
+			uint insideTestCount = workingSetSize - 3;
+			for (uint testIndex = 0; testIndex < insideTestCount; ++testIndex)
+			{
+				const uint vertexIndex = workingSet[(testIndex + k + 1) % workingSetSize];
+				const vec2 pos = p->vertexPosition[vertexIndex];
+				
+				if (vec2_dot(vec3_xy(planes[0]), pos) - planes[0].z < 0.0f &&
+					vec2_dot(vec3_xy(planes[1]), pos) - planes[1].z < 0.0f &&
+					vec2_dot(vec3_xy(planes[2]), pos) - planes[2].z < 0.0f)
+				{
+					shouldClip = false;
+					break;
+				}
+			}
 			
 			if (shouldClip)
 			{
@@ -530,4 +578,11 @@ static void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCo
 			}
 		}
 	}
+
+	assert(workingSetSize == 3);
+
+	triangle_t* triangle = &triangles[(*triangleCount)++];
+	triangle->i[0] = workingSet[0];
+	triangle->i[1] = workingSet[1];
+	triangle->i[2] = workingSet[2];
 }

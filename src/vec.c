@@ -12,6 +12,11 @@ vec2 vec2_sub(vec2 a, vec2 b)
 	return (vec2){ a.x - b.x, a.y - b.y };
 }
 
+vec2 vec2_mul(vec2 a, vec2 b)
+{
+	return (vec2){ a.x * b.x, a.y * b.y };
+}
+
 float vec2_length(vec2 v)
 {
 	return sqrtf(vec2_dot(v, v));

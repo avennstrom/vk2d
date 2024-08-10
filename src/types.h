@@ -61,6 +61,11 @@ typedef struct uint3 {
 	uint32_t z;
 } uint3;
 
+typedef struct int2 {
+	int32_t x;
+	int32_t y;
+} int2;
+
 typedef uint8_t byte;
 typedef uint16_t ushort;
 typedef uint32_t uint;

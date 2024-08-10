@@ -1,5 +1,6 @@
 #pragma once
 
+#include "types.h"
 #include "vulkan.h"
 
 #define SCENE_COLOR_FORMAT VK_FORMAT_R16G16B16A16_SFLOAT
@@ -14,7 +15,7 @@ typedef struct dedicated_render_target {
 } dedicated_render_target_t;
 
 typedef struct render_targets {
-	VkExtent2D resolution;
+	uint2 resolution;
 	dedicated_render_target_t sceneDepth;
 	dedicated_render_target_t sceneColor;
 } render_targets_t;
@@ -22,7 +23,7 @@ typedef struct render_targets {
 int AllocateDedicatedRenderTarget2D(
 	dedicated_render_target_t *rt,
 	vulkan_t *vulkan,
-	VkExtent2D resolution,
+	uint2 resolution,
 	VkFormat format,
 	VkImageUsageFlags usage,
 	const char* debugName);
@@ -34,7 +35,7 @@ void destroy_dedicated_render_target(
 int render_targets_create(
 	render_targets_t *rt,
 	vulkan_t *vulkan,
-	VkExtent2D resolution);
+	uint2 resolution);
 
 void render_targets_destroy(
 	render_targets_t *rt,

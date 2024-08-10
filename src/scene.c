@@ -739,11 +739,11 @@ void scene_draw(
 			.pDepthAttachment = &depthAttachment,
 			.layerCount = 1,
 			.renderArea = {
-				.extent = rc->rt->resolution,
+				.extent = {rc->rt->resolution.x, rc->rt->resolution.y},
 			}};
 		vkCmdBeginRendering(cb, &renderingInfo);
 		{
-			SetViewportAndScissor(cb, (VkOffset2D){}, rc->rt->resolution);
+			SetViewportAndScissor(cb, (VkOffset2D){}, (VkExtent2D){rc->rt->resolution.x, rc->rt->resolution.y});
 			
 			model_loader_info_t modelLoaderInfo;
 			model_loader_get_info(&modelLoaderInfo, rc->modelLoader);

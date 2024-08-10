@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types.h"
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -49,16 +51,15 @@ struct window_event {
 			enum key_code code;
 		} key;
 		struct {
-			uint32_t width;
-			uint32_t height;
+			uint2 size;
 		} size;
 		struct {
 			enum button button;
-			int x, y;
+			int2 pos;
 		} button;
 		struct {
-			int x, y;
-			int dx, dy;
+			int2 pos;
+			int2 delta;
 		} mouse;
 
 		struct {
@@ -68,7 +69,7 @@ struct window_event {
 };
 
 const char* window_get_surface_extension_name();
-window_t* window_create(uint32_t width, uint32_t height);
+window_t* window_create(uint2 size);
 void window_destroy(window_t* window);
 VkSurfaceKHR window_create_surface(VkInstance instance, window_t* window);
 bool window_poll(window_event_t* event, window_t* window);

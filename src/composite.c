@@ -196,7 +196,7 @@ void draw_composite(
 		.pColorAttachments = colorAttachments,
 		.layerCount = 1,
 		.renderArea = {
-			.extent = rt->resolution,
+			.extent = {rt->resolution.x, rt->resolution.y},
 		},
 	};
 

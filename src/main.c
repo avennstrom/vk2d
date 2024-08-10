@@ -20,6 +20,7 @@
 #include "vec.h"
 #include "terrain.h"
 #include "world.h"
+#include "editor.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -83,7 +84,7 @@ typedef struct app
 	// size_t uploadBarrierCount;
 } app_t;
 
-static int CreateSwapchain(swapchain_t* swapchain, vulkan_t *vulkan, VkSurfaceKHR surface, VkExtent2D resolution);
+static int CreateSwapchain(swapchain_t* swapchain, vulkan_t *vulkan, VkSurfaceKHR surface, uint2 resolution);
 static void DestroySwapchain(swapchain_t* swapchain, vulkan_t *vulkan);
 
 // static void QueueImageUpload(app_t *app, const image_upload_t *upload)
@@ -241,9 +242,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-	VkExtent2D resolution = {1280, 860};
+	uint2 resolution = {1280, 860};
 
-	window_t* window = window_create(resolution.width, resolution.height);
+	window_t* window = window_create(resolution);
 	if (window == NULL)
 	{
 		fprintf(stderr, "Failed to create OS window\n");
@@ -346,11 +347,20 @@ int main(int argc, char **argv)
 	FinalizeStagingMemoryAllocator(&stagingAllocation, &staging_allocator);
 
 	game_t* game = game_create(window, modelLoader, world);
+	editor_t* editor = editor_create(world);
 
 	delta_timer_t deltaTimer;
 	delta_timer_reset(&deltaTimer);
 
 	bool shutdown = false;
+	
+	typedef enum app_mode
+	{
+		APP_MODE_GAME,
+		APP_MODE_EDIT,
+	} app_mode_t;
+
+	app_mode_t appMode = APP_MODE_GAME;
 
 	for (;;)
 	{
@@ -372,7 +382,29 @@ int main(int argc, char **argv)
 				break;
 			}
 
-			game_window_event(game, &event);
+			if (event.type == WINDOW_EVENT_KEY_DOWN)
+			{
+				if (event.data.key.code == KEY_F1)
+				{
+					if (appMode == APP_MODE_EDIT)
+					{
+						appMode = APP_MODE_GAME;
+					}
+					else if (appMode == APP_MODE_GAME)
+					{
+						appMode = APP_MODE_EDIT;
+					}
+				}
+			}
+
+			if (appMode == APP_MODE_GAME)
+			{
+				game_window_event(game, &event);
+			}
+			else if (appMode == APP_MODE_EDIT)
+			{
+				editor_window_event(editor, &event);
+			}
 		}
 
 		if (shutdown)
@@ -420,14 +452,12 @@ int main(int argc, char **argv)
 		double elapsedTime;
 		delta_timer_capture(&deltaTime, &elapsedTime, &deltaTimer);
 
-		const game_viewport_t gameViewport = {
-			.width = resolution.width,
-			.height = resolution.height,
-		};
-
 		MakeCurrentDebugRenderer(&debugRenderer);
 		
-		game_tick(game, (float)deltaTime, &gameViewport);
+		if (appMode == APP_MODE_GAME)
+		{
+			game_tick(game, (float)deltaTime, resolution);
+		}
 
 		//
 		// ---- render ----
@@ -440,7 +470,14 @@ int main(int argc, char **argv)
 		scb_t* scb = scene_begin(scene);
 		assert(scb != NULL);
 
-		game_render(scb, game);
+		if (appMode == APP_MODE_GAME)
+		{
+			game_render(scb, game);
+		}
+		else if (appMode == APP_MODE_EDIT)
+		{
+			editor_render(scb, editor, resolution);
+		}
 		
 		VkCommandBuffer cb = frame->cb;
 
@@ -624,7 +661,8 @@ int main(int argc, char **argv)
 			}
 			assert(surfaceCapabilities.minImageExtent.width == surfaceCapabilities.maxImageExtent.width);
 			assert(surfaceCapabilities.minImageExtent.height == surfaceCapabilities.maxImageExtent.height);
-			resolution = surfaceCapabilities.maxImageExtent;
+			resolution.x = surfaceCapabilities.maxImageExtent.width;
+			resolution.y = surfaceCapabilities.maxImageExtent.height;
 
 			render_targets_create(&rt, &vulkan, resolution);
 			CreateSwapchain(&swapchain, &vulkan, surface, resolution);
@@ -688,7 +726,7 @@ int main(int argc, char **argv)
 	return 0;
 }
 
-static int CreateSwapchain(swapchain_t* swapchain, vulkan_t *vulkan, VkSurfaceKHR surface, VkExtent2D resolution)
+static int CreateSwapchain(swapchain_t* swapchain, vulkan_t *vulkan, VkSurfaceKHR surface, uint2 resolution)
 {
 	VkResult r;
 
@@ -699,7 +737,7 @@ static int CreateSwapchain(swapchain_t* swapchain, vulkan_t *vulkan, VkSurfaceKH
 		.surface = surface,
 		.imageFormat = vulkan->surfaceFormat.format,
 		.imageColorSpace = vulkan->surfaceFormat.colorSpace,
-		.imageExtent = resolution,
+		.imageExtent = {resolution.x, resolution.y},
 		.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 		.imageArrayLayers = 1,
 		.minImageCount = 2,

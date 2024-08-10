@@ -102,8 +102,8 @@ int game_window_event(game_t* game, const window_event_t* event)
 			game->buttonstate[event->data.button.button] = false;
 			break;
 		case WINDOW_EVENT_MOUSE_MOVE:
-			game->mouseX = event->data.mouse.x;
-			game->mouseY = event->data.mouse.y;
+			game->mouseX = event->data.mouse.pos.x;
+			game->mouseY = event->data.mouse.pos.y;
 			break;
 		case WINDOW_EVENT_MOUSE_SCROLL:
 			if (event->data.scroll.delta > 0)
@@ -174,11 +174,11 @@ static void calculate_camera(scb_camera_t* renderCamera, const camera_t* camera,
 	renderCamera->viewProjectionMatrix = mat_transpose(viewProjectionMatrix);
 }
 
-void game_tick(game_t* game, float deltaTime, const game_viewport_t* viewport)
+void game_tick(game_t* game, float deltaTime, uint2 resolution)
 {
 	int r;
 
-	game->aspectRatio = viewport->width / (float)viewport->height;
+	game->aspectRatio = resolution.x / (float)resolution.y;
 
 	switch (game->state) {
 		case GameState_LoadScene:
