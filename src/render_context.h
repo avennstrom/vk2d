@@ -7,6 +7,7 @@ typedef struct render_targets render_targets_t;
 typedef struct model_loader model_loader_t;
 //typedef struct terrain terrain_t;
 typedef struct world world_t;
+typedef struct wind wind_t;
 
 typedef struct render_context
 {
@@ -19,5 +20,6 @@ typedef struct render_context
 	model_loader_t*				modelLoader;
 	//terrain_t*					terrain;
 	world_t*					world;
+	wind_t*						wind;
 } render_context_t;
 

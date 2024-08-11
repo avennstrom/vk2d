@@ -24,6 +24,7 @@ enum key_code {
 	KEY_SPACE,
 	KEY_CONTROL,
 	KEY_SHIFT,
+	KEY_DELETE,
 	KEY_F1,
 };
 

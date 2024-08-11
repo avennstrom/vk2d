@@ -21,6 +21,7 @@
 #include "terrain.h"
 #include "world.h"
 #include "editor.h"
+#include "wind.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -334,6 +335,7 @@ int main(int argc, char **argv)
 	model_loader_t* modelLoader = model_loader_create(&vulkan, &gameResource, &content);
 	world_t* world = world_create(&vulkan);
 	//terrain_t* terrain = terrain_create(&vulkan);
+	wind_t* wind = wind_create(&vulkan);
 
 	{
 		FILE* f = fopen("world.bin", "rb");
@@ -351,11 +353,12 @@ int main(int argc, char **argv)
 	model_loader_alloc_staging_mem(&staging_allocator, modelLoader);
 	//terrain_alloc_staging_mem(&staging_allocator, terrain);
 	world_alloc_staging_mem(&staging_allocator, world);
+	wind_alloc_staging_mem(&staging_allocator, wind);
 
 	staging_memory_allocation_t stagingAllocation;
 	FinalizeStagingMemoryAllocator(&stagingAllocation, &staging_allocator);
 
-	game_t* game = game_create(window, modelLoader, world);
+	game_t* game = game_create(window, modelLoader, world, wind);
 	editor_t* editor = editor_create(world);
 
 	delta_timer_t deltaTimer;
@@ -528,11 +531,13 @@ int main(int argc, char **argv)
 			.modelLoader = modelLoader,
 			//.terrain = terrain,
 			.world = world,
+			.wind = wind,
 		};
 
 		model_loader_update(cb, modelLoader, &rc);
 		//terrain_update(cb, terrain, &rc);
 		world_update(world, cb, &rc);
+		wind_update(cb, wind, &rc, (float)deltaTime);
 
 		{
 			const VkMemoryBarrier memoryBarriers[] = {
@@ -726,6 +731,10 @@ int main(int argc, char **argv)
 		DeinitFrame(&app.frames[i], &vulkan);
 	}
 
+	game_destroy(game);
+	editor_destroy(editor);
+
+	wind_destroy(wind);
 	world_destroy(world);
 	//terrain_destroy(terrain);
 	model_loader_destroy(modelLoader);

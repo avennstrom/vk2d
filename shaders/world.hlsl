@@ -3,6 +3,7 @@
 [[vk::binding(0)]]	ConstantBuffer<gpu_frame_uniforms_t>	g_frame;
 [[vk::binding(1)]]	ByteAddressBuffer						g_vertexPositionBuffer;
 [[vk::binding(2)]]	ByteAddressBuffer						g_vertexColorBuffer;
+[[vk::binding(3)]]	ByteAddressBuffer						g_windGrid;
 
 struct VsInput
 {
@@ -39,6 +40,30 @@ float wind(float t)
 	return sin(t * 2.0f) * sin(t * 3.0f) * cos(t * 5.0f) * cos(t * 7.0f);
 }
 
+float2 sampleWindGrid(float2 pos)
+{
+	const float2 floatGridPos = (pos - g_frame.windGridOrigin) / WIND_GRID_CELL_SIZE;
+	const float2 bilinearFactors = frac(floatGridPos);
+
+	const int2 gridPos = int2(floatGridPos - 0.5f);
+	const int cellIndex = gridPos.x + gridPos.y * WIND_GRID_RESOLUTION;
+	
+	const int i00 = cellIndex;
+	const int i10 = cellIndex + 1;
+	const int i01 = cellIndex + WIND_GRID_RESOLUTION;
+	const int i11 = cellIndex + WIND_GRID_RESOLUTION + 1;
+
+	const float2 v00 = g_windGrid.Load<float2>(i00 * sizeof(float2));
+	const float2 v10 = g_windGrid.Load<float2>(i10 * sizeof(float2));
+	const float2 v01 = g_windGrid.Load<float2>(i01 * sizeof(float2));
+	const float2 v11 = g_windGrid.Load<float2>(i11 * sizeof(float2));
+	
+	const float2 x0 = lerp(v00, v10, bilinearFactors.x);
+	const float2 x1 = lerp(v01, v11, bilinearFactors.x);
+	
+	return lerp(x0, x1, bilinearFactors.y);
+}
+
 VsOutput vs_main(VsInput input)
 {
 	VsOutput output = (VsOutput)0;
@@ -48,6 +73,7 @@ VsOutput vs_main(VsInput input)
 	const float		vertexAnimationWeight	= (vertexColorPacked >> 24) / 255.0f;
 	
 	vertexPosition.x += wind(g_frame.elapsedTime * 0.001f * 0.5f + vertexPosition.x * 0.8f) * vertexAnimationWeight * 0.1f;
+	vertexPosition.xy += sampleWindGrid(vertexPosition.xy) * vertexAnimationWeight * 0.4f;
 
 	output.color	= unpackVertexColor(vertexColorPacked);
 	output.position	= mul(float4(vertexPosition, 1.0), g_frame.matViewProj);

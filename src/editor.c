@@ -135,11 +135,34 @@ void editor_window_event(editor_t* editor, const window_event_t* event)
 			{
 				editor->insertMode = true;
 			}
+			if (event->data.key.code == KEY_DELETE)
+			{
+				if (editor->editPolygon != NULL && editor->editPolygon->vertexCount > 3)
+				{
+					--editor->editPolygon->vertexCount;
+					for (uint i = editor->editVertex; i < editor->editPolygon->vertexCount; ++i)
+					{
+						editor->editPolygon->vertexPosition[i] = editor->editPolygon->vertexPosition[i + 1];
+					}
+
+					editor->editPolygon = NULL;
+				}
+			}
 			break;
 		case WINDOW_EVENT_KEY_UP:
 			if (event->data.key.code == KEY_CONTROL)
 			{
 				editor->insertMode = false;
+			}
+			break;
+		case WINDOW_EVENT_MOUSE_SCROLL:
+			if (event->data.scroll.delta > 0)
+			{
+				editor->camera.height *= 0.7f;
+			}
+			if (event->data.scroll.delta < 0)
+			{
+				editor->camera.height *= 1.3f;
 			}
 			break;
 	}

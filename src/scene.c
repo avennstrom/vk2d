@@ -6,6 +6,7 @@
 #include "color.h"
 #include "terrain.h"
 #include "world.h"
+#include "wind.h"
 
 #include <memory.h>
 #include <stdbool.h>
@@ -215,6 +216,7 @@ static int scene_create_world_pipeline(scene_t* scene, vulkan_t* vulkan)
 		{ 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
 		{ 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
 		{ 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
+		{ 3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
 	};
 	const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = {
 		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -748,6 +750,11 @@ void scene_draw(
 			model_loader_info_t modelLoaderInfo;
 			model_loader_get_info(&modelLoaderInfo, rc->modelLoader);
 
+			wind_render_info_t windInfo;
+			wind_get_render_info(&windInfo, rc->wind);
+
+			frame->uniforms->windGridOrigin = windInfo.gridOrigin;
+
 			if (gpuDrawCount > 0)
 			{
 				descriptor_allocator_begin(rc->dsalloc, scene->modelDescriptorSetLayout, "SceneModel");
@@ -769,6 +776,7 @@ void scene_draw(
 				descriptor_allocator_set_uniform_buffer(rc->dsalloc, 0, frameUniformBuffer);
 				descriptor_allocator_set_storage_buffer(rc->dsalloc, 1, (VkDescriptorBufferInfo){ worldInfo.vertexPositionBuffer, 0, VK_WHOLE_SIZE });
 				descriptor_allocator_set_storage_buffer(rc->dsalloc, 2, (VkDescriptorBufferInfo){ worldInfo.vertexColorBuffer, 0, VK_WHOLE_SIZE });
+				descriptor_allocator_set_storage_buffer(rc->dsalloc, 3, (VkDescriptorBufferInfo){ windInfo.gridBuffer, 0, VK_WHOLE_SIZE });
 				const VkDescriptorSet descriptorSet = descriptor_allocator_end(rc->dsalloc);
 
 				vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->worldPipelineLayout, 0, 1, &descriptorSet, 0, NULL);

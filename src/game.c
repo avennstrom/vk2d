@@ -38,6 +38,7 @@ enum {
 
 typedef struct game {
 	world_t*				world;
+	wind_t*					wind;
 	window_t*				window;
 	const model_loader_t*	modelLoader;
 	int						state;
@@ -54,7 +55,7 @@ typedef struct game {
 	bool					buttonstate[2];
 } game_t;
 
-game_t* game_create(window_t* window, const model_loader_t* modelLoader, world_t* world)
+game_t* game_create(window_t* window, const model_loader_t* modelLoader, world_t* world, wind_t* wind)
 {
 	game_t* game = calloc(1, sizeof(game_t));
 	if (game == NULL) {
@@ -62,6 +63,7 @@ game_t* game_create(window_t* window, const model_loader_t* modelLoader, world_t
 	}
 
 	game->world			= world;
+	game->wind			= wind;
 	game->window		= window;
 	game->modelLoader	= modelLoader;
 
@@ -71,7 +73,7 @@ game_t* game_create(window_t* window, const model_loader_t* modelLoader, world_t
 	};
 
 	game->camera = (camera_t){
-		.height = 10.0f,
+		.height = 9.0f,
 	};
 
 	return game;
@@ -104,16 +106,6 @@ int game_window_event(game_t* game, const window_event_t* event)
 		case WINDOW_EVENT_MOUSE_MOVE:
 			game->mouseX = event->data.mouse.pos.x;
 			game->mouseY = event->data.mouse.pos.y;
-			break;
-		case WINDOW_EVENT_MOUSE_SCROLL:
-			if (event->data.scroll.delta > 0)
-			{
-				game->camera.height *= 0.7f;
-			}
-			if (event->data.scroll.delta < 0)
-			{
-				game->camera.height *= 1.3f;
-			}
 			break;
 	}
 
@@ -149,6 +141,8 @@ static void TickPlayerMovement(game_t* game, float deltaTime)
 
 	game->player.pos.x += moveX * speed;
 	game->player.pos.y += moveY * speed;
+
+	game->player.vel.x = moveX * speed;
 
 	if (game->keystate[KEY_SPACE] && game->player.isGrounded)
 	{
@@ -201,7 +195,8 @@ void game_tick(game_t* game, float deltaTime, uint2 resolution)
 		player->isGrounded = false;
 
 		player->vel.y -= PLAYER_GRAVITY * deltaTime;
-		player->pos = vec2_add(player->pos, vec2_scale(player->vel, deltaTime));
+		//player->pos = vec2_add(player->pos, vec2_scale(player->vel, deltaTime));
+		player->pos.y = player->pos.y + player->vel.y * deltaTime;
 
 		world_collision_info_t worldCollision;
 		world_get_collision_info(&worldCollision, game->world);
@@ -302,13 +297,24 @@ void game_tick(game_t* game, float deltaTime, uint2 resolution)
 			if (maxPushoutDistance != FLT_MAX)
 			{
 				player->pos			= vec2_add(player->pos, maxPushout);
-				player->vel			= (vec2){0.0f, 0.0f};
+				player->vel.y		= 0.0f;
 				player->isGrounded	= true;
 			}
 		}
 	}
 
 	game->camera.pos = vec2_lerp(game->camera.pos, (vec2){game->player.pos.x, game->player.pos.y + game->player.size.y * 0.5f}, 0.005f);
+
+	{
+		wind_injection_t injection = {
+			.aabbMin.x = game->player.pos.x - game->player.size.x * 0.5f,
+			.aabbMax.x = game->player.pos.x + game->player.size.x * 0.5f,
+			.aabbMin.y = game->player.pos.y,
+			.aabbMax.y = game->player.pos.y + game->player.size.y,
+			.vel = game->player.vel,
+		};
+		wind_inject(game->wind, injection);
+	}
 
 	return;
 }

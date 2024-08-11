@@ -3,6 +3,9 @@
 #define MAX_DRAWS (1024)
 #define MAX_POINT_LIGHTS (64)
 
+#define WIND_GRID_RESOLUTION	(64)
+#define WIND_GRID_CELL_SIZE		(0.5f)
+
 #ifdef __STDC__
 typedef struct gpu_draw_t gpu_draw_t;
 typedef struct gpu_point_light_t gpu_point_light_t;
@@ -42,14 +45,17 @@ struct gpu_point_light_t
 struct gpu_frame_uniforms_t
 {
 	mat4	matViewProj;
+
 	uint	drawCount;
 	uint	pointLightCount;
 	uint	spotLightCount;
 	float	elapsedTime;
+
+	vec2	windGridOrigin;
 };
 
 #ifdef __STDC__
 _Static_assert(sizeof(gpu_draw_t) == 96, "");
 _Static_assert(sizeof(gpu_point_light_t) == 32, "");
-_Static_assert(sizeof(gpu_frame_uniforms_t) == 80, "");
+_Static_assert(sizeof(gpu_frame_uniforms_t) == 88, "");
 #endif
