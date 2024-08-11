@@ -5,6 +5,7 @@
 #include "staging_memory.h"
 #include "types.h"
 
+#include <stdio.h>
 #include <stdbool.h>
 
 #define POLYGON_MAX_VERTICES 64
@@ -17,6 +18,9 @@ void world_destroy(world_t* world);
 void world_alloc_staging_mem(staging_memory_allocator_t* allocator, world_t* world);
 
 void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc);
+
+int world_serialize(world_t* world, FILE* f);
+int world_deserialize(world_t* world, FILE* f);
 
 typedef struct world_render_info
 {

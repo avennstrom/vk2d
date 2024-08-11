@@ -335,6 +335,15 @@ int main(int argc, char **argv)
 	world_t* world = world_create(&vulkan);
 	//terrain_t* terrain = terrain_create(&vulkan);
 
+	{
+		FILE* f = fopen("world.bin", "rb");
+		if (f != NULL)
+		{
+			world_deserialize(world, f);
+			fclose(f);
+		}
+	}
+
 	staging_memory_allocator_t staging_allocator;
 	ResetStagingMemoryAllocator(&staging_allocator, &vulkan);
 	scene_alloc_staging_mem(&staging_allocator, scene);
@@ -361,6 +370,8 @@ int main(int argc, char **argv)
 	} app_mode_t;
 
 	app_mode_t appMode = APP_MODE_GAME;
+
+	bool holdingCtrl = false;
 
 	for (;;)
 	{
@@ -394,6 +405,25 @@ int main(int argc, char **argv)
 					{
 						appMode = APP_MODE_EDIT;
 					}
+				}
+				else if (event.data.key.code == KEY_CONTROL)
+				{
+					holdingCtrl = true;
+				}
+				else if (event.data.key.code == KEY_S)
+				{
+					FILE* f = fopen("world.bin", "wb");
+					assert(f != NULL);
+					world_serialize(world, f);
+					fclose(f);
+				}
+			}
+			
+			if (event.type == WINDOW_EVENT_KEY_UP)
+			{
+				if (event.data.key.code == KEY_CONTROL)
+				{
+					holdingCtrl = false;
 				}
 			}
 

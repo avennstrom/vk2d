@@ -4,7 +4,6 @@
 #include "vec.h"
 #include "util.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
@@ -92,7 +91,6 @@ world_t* world_create(vulkan_t* vulkan)
 
 	{
 		editor_polygon_t* polygon = &world->polygon;
-
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-5.0f, 1.0f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){0.0f, 0.1f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){5.0f, 0.1f};
@@ -385,6 +383,45 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 #if 0
 	editor_polygon_debug_draw(&world->polygon);
 #endif
+}
+
+int world_serialize(world_t* world, FILE* f)
+{
+	int r;
+
+	uint polygonCount = 1;
+	r = fwrite(&polygonCount, sizeof(uint), 1, f);
+	assert(r == 1);
+	
+	{
+		const editor_polygon_t* polygon = &world->polygon;
+		r = fwrite(&polygon->vertexCount, sizeof(uint), 1, f);
+		assert(r == 1);
+		r = fwrite(polygon->vertexPosition, sizeof(vec2), polygon->vertexCount, f);
+		assert(r == polygon->vertexCount);
+	}
+
+	return 0;
+}
+
+int world_deserialize(world_t* world, FILE* f)
+{
+	int r;
+
+	uint polygonCount;
+	r = fread(&polygonCount, sizeof(uint), 1, f);
+	assert(r == 1);
+	assert(polygonCount == 1);
+	
+	{
+		editor_polygon_t* polygon = &world->polygon;
+		r = fread(&polygon->vertexCount, sizeof(uint), 1, f);
+		assert(r == 1);
+		r = fread(polygon->vertexPosition, sizeof(vec2), polygon->vertexCount, f);
+		assert(r == polygon->vertexCount);
+	}
+
+	return 0;
 }
 
 bool world_get_render_info(world_render_info_t* info, world_t* world)
