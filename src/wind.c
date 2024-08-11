@@ -83,15 +83,18 @@ int wind_alloc_staging_mem(staging_memory_allocator_t* allocator, wind_t* wind)
 	return 0;
 }
 
-void wind_update(VkCommandBuffer cb, wind_t* wind, const render_context_t* rc, float deltaTime)
+void wind_tick(wind_t* wind)
 {
 	for (int i = 0; i < WIND_GRID_CELL_COUNT; ++i)
 	{
 		vec2 vel = wind->gridVel[i];
-		vel = vec2_scale(vel, 0.99f);
+		vel = vec2_scale(vel, 0.85f);
 		wind->gridVel[i] = vel;
 	}
-	
+}
+
+void wind_update(VkCommandBuffer cb, wind_t* wind, const render_context_t* rc)
+{
 #if 0
 	for (int x = 0; x < WIND_GRID_RESOLUTION + 1; ++x)
 	{
@@ -158,7 +161,7 @@ void wind_inject(wind_t* wind, wind_injection_t injection)
 			const int i = x + y * WIND_GRID_RESOLUTION;
 
 			vec2 vel = wind->gridVel[i];
-			vel = vec2_add(vel, vec2_scale(vec2_normalize(injection.vel), 0.01f));
+			vel = vec2_add(vel, vec2_scale(vec2_normalize(injection.vel), 0.12f));
 			if (vec2_length(vel) > 1.0f)
 			{
 				vel = vec2_normalize(vel);

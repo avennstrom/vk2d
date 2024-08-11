@@ -12,7 +12,8 @@ void wind_destroy(wind_t* wind);
 
 int wind_alloc_staging_mem(staging_memory_allocator_t* allocator, wind_t* wind);
 
-void wind_update(VkCommandBuffer cb, wind_t* wind, const render_context_t* rc, float deltaTime);
+void wind_tick(wind_t* wind);
+void wind_update(VkCommandBuffer cb, wind_t* wind, const render_context_t* rc);
 
 typedef struct wind_injection
 {

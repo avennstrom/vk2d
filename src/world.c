@@ -8,8 +8,8 @@
 #include <math.h>
 #include <assert.h>
 
-#define WORLD_MAX_INDEX_COUNT (16 * 1024)
-#define WORLD_MAX_VERTEX_COUNT (16 * 1024)
+#define WORLD_MAX_INDEX_COUNT (256 * 1024)
+#define WORLD_MAX_VERTEX_COUNT (256 * 1024)
 #define WORLD_INDEX_BUFFER_SIZE (WORLD_MAX_INDEX_COUNT * sizeof(uint16_t))
 #define WORLD_POSITION_BUFFER_SIZE (WORLD_MAX_VERTEX_COUNT * sizeof(vec3))
 #define WORLD_COLOR_BUFFER_SIZE (WORLD_MAX_VERTEX_COUNT * sizeof(uint32_t))
@@ -33,6 +33,7 @@ typedef struct world
 {
 	vulkan_t*			vulkan;
 	world_state_t		state;
+	uint				stagingCounter;
 
 	VkBuffer			indexBuffer;
 	VkDeviceMemory		indexBufferMemory;
@@ -322,6 +323,12 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 	{
 		case WORLD_STATE_UPLOAD_TRIANGLES:
 		{
+			if (world->stagingCounter++ < FRAME_COUNT)
+			{
+				break;
+			}
+			world->stagingCounter = 0;
+
 			uint16_t* stagingIndices = (uint16_t*)world->stagingBufferMemory;
 			vec3* stagingPositions = (vec3*)((uint8_t*)world->stagingBufferMemory + WORLD_INDEX_BUFFER_SIZE);
 			uint32_t* stagingColors = (uint32_t*)((uint8_t*)world->stagingBufferMemory + WORLD_INDEX_BUFFER_SIZE + WORLD_POSITION_BUFFER_SIZE);
@@ -373,7 +380,7 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 		}
 	}
 	
-#if 0
+#if 1
 	for (size_t i = 0; i < world->colliders.triangleCount; ++i)
 	{
 		triangle_collider_debug_draw(&world->colliders.triangles[i]);

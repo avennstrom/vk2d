@@ -73,7 +73,7 @@ VsOutput vs_main(VsInput input)
 	const float		vertexAnimationWeight	= (vertexColorPacked >> 24) / 255.0f;
 	
 	vertexPosition.x += wind(g_frame.elapsedTime * 0.001f * 0.5f + vertexPosition.x * 0.8f) * vertexAnimationWeight * 0.1f;
-	vertexPosition.xy += sampleWindGrid(vertexPosition.xy) * vertexAnimationWeight * 0.4f;
+	vertexPosition.xy += sampleWindGrid(vertexPosition.xy) * vertexAnimationWeight * 0.5f;
 
 	output.color	= unpackVertexColor(vertexColorPacked);
 	output.position	= mul(float4(vertexPosition, 1.0), g_frame.matViewProj);

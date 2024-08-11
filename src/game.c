@@ -47,7 +47,6 @@ typedef struct game {
 	int						mouseX;
 	int						mouseY;
 
-	float					t;
 	player_t				player;
 	camera_t				camera;
 
@@ -168,7 +167,7 @@ static void calculate_camera(scb_camera_t* renderCamera, const camera_t* camera,
 	renderCamera->viewProjectionMatrix = mat_transpose(viewProjectionMatrix);
 }
 
-void game_tick(game_t* game, float deltaTime, uint2 resolution)
+void game_tick(game_t* game, uint2 resolution)
 {
 	int r;
 
@@ -183,20 +182,18 @@ void game_tick(game_t* game, float deltaTime, uint2 resolution)
 
 		case GameState_Play:
 		{
-			TickPlayerMovement(game, deltaTime);
+			TickPlayerMovement(game, DELTA_TIME_MS);
 		}
 	}
-
-	game->t += deltaTime;
 
 	{
 		player_t* player = &game->player;
 
 		player->isGrounded = false;
 
-		player->vel.y -= PLAYER_GRAVITY * deltaTime;
+		player->vel.y -= PLAYER_GRAVITY * DELTA_TIME_MS;
 		//player->pos = vec2_add(player->pos, vec2_scale(player->vel, deltaTime));
-		player->pos.y = player->pos.y + player->vel.y * deltaTime;
+		player->pos.y = player->pos.y + player->vel.y * DELTA_TIME_MS;
 
 		world_collision_info_t worldCollision;
 		world_get_collision_info(&worldCollision, game->world);
@@ -303,7 +300,7 @@ void game_tick(game_t* game, float deltaTime, uint2 resolution)
 		}
 	}
 
-	game->camera.pos = vec2_lerp(game->camera.pos, (vec2){game->player.pos.x, game->player.pos.y + game->player.size.y * 0.5f}, 0.005f);
+	game->camera.pos = vec2_lerp(game->camera.pos, (vec2){game->player.pos.x, game->player.pos.y + game->player.size.y * 0.5f}, 0.1f);
 
 	{
 		wind_injection_t injection = {

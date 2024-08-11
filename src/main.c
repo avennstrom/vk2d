@@ -364,6 +364,8 @@ int main(int argc, char **argv)
 	delta_timer_t deltaTimer;
 	delta_timer_reset(&deltaTimer);
 
+	double tickAccumulator = 0.0f;
+
 	bool shutdown = false;
 	
 	typedef enum app_mode
@@ -485,12 +487,21 @@ int main(int argc, char **argv)
 		double elapsedTime;
 		delta_timer_capture(&deltaTime, &elapsedTime, &deltaTimer);
 
-		MakeCurrentDebugRenderer(&debugRenderer);
-		
-		if (appMode == APP_MODE_GAME)
+		tickAccumulator += deltaTime;
+
+		while (tickAccumulator >= DELTA_TIME_MS)
 		{
-			game_tick(game, (float)deltaTime, resolution);
+			tickAccumulator -= DELTA_TIME_MS;
+
+			if (appMode == APP_MODE_GAME)
+			{
+				game_tick(game, resolution);
+			}
+
+			wind_tick(wind);
 		}
+
+		MakeCurrentDebugRenderer(&debugRenderer);
 
 		//
 		// ---- render ----
@@ -531,7 +542,7 @@ int main(int argc, char **argv)
 		model_loader_update(cb, modelLoader, &rc);
 		//terrain_update(cb, terrain, &rc);
 		world_update(world, cb, &rc);
-		wind_update(cb, wind, &rc, (float)deltaTime);
+		wind_update(cb, wind, &rc);
 
 		{
 			const VkMemoryBarrier memoryBarriers[] = {
