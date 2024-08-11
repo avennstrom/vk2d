@@ -753,8 +753,6 @@ void scene_draw(
 			wind_render_info_t windInfo;
 			wind_get_render_info(&windInfo, src->wind);
 
-			frame->uniforms->windGridOrigin = windInfo.gridOrigin;
-
 			if (gpuDrawCount > 0)
 			{
 				descriptor_allocator_begin(rc->dsalloc, scene->modelDescriptorSetLayout, "SceneModel");

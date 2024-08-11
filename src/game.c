@@ -72,7 +72,7 @@ game_t* game_create(window_t* window, const model_loader_t* modelLoader, world_t
 	};
 
 	game->camera = (camera_t){
-		.height = 9.0f,
+		.height = 8.0f,
 	};
 
 	return game;
@@ -172,6 +172,8 @@ void game_tick(game_t* game, uint2 resolution)
 	int r;
 
 	game->aspectRatio = resolution.x / (float)resolution.y;
+
+	vec2 prevPlayerPos = game->player.pos;
 
 	switch (game->state) {
 		case GameState_LoadScene:
@@ -303,14 +305,17 @@ void game_tick(game_t* game, uint2 resolution)
 	game->camera.pos = vec2_lerp(game->camera.pos, (vec2){game->player.pos.x, game->player.pos.y + game->player.size.y * 0.5f}, 0.1f);
 
 	{
+		const vec2 vel = vec2_sub(game->player.pos, prevPlayerPos);
+
 		wind_injection_t injection = {
 			.aabbMin.x = game->player.pos.x - game->player.size.x * 0.5f,
 			.aabbMax.x = game->player.pos.x + game->player.size.x * 0.5f,
 			.aabbMin.y = game->player.pos.y,
 			.aabbMax.y = game->player.pos.y + game->player.size.y,
-			.vel = game->player.vel,
+			.vel = vel,
 		};
 		wind_inject(game->wind, injection);
+		wind_set_focus(game->wind, game->player.pos);
 	}
 
 	return;

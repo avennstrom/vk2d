@@ -50,12 +50,10 @@ struct gpu_frame_uniforms_t
 	uint	pointLightCount;
 	uint	spotLightCount;
 	float	elapsedTime;
-
-	vec2	windGridOrigin;
 };
 
 #ifdef __STDC__
 _Static_assert(sizeof(gpu_draw_t) == 96, "");
 _Static_assert(sizeof(gpu_point_light_t) == 32, "");
-_Static_assert(sizeof(gpu_frame_uniforms_t) == 88, "");
+_Static_assert(sizeof(gpu_frame_uniforms_t) == 80, "");
 #endif

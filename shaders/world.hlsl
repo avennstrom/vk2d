@@ -42,16 +42,24 @@ float wind(float t)
 
 float2 sampleWindGrid(float2 pos)
 {
-	const float2 floatGridPos = (pos - g_frame.windGridOrigin) / WIND_GRID_CELL_SIZE;
+	const float2 floatGridPos = pos / WIND_GRID_CELL_SIZE;
+#if 0
+	const uint2 gridPos = uint2(floor(floatGridPos));
+	const uint index = gridPos.x + gridPos.y * WIND_GRID_RESOLUTION;
+	return g_windGrid.Load<float2>(index * sizeof(float2));
+#else
 	const float2 bilinearFactors = frac(floatGridPos);
+	const int2 topLeft = int2(floor(floatGridPos - 0.5f));
 
-	const int2 gridPos = int2(floatGridPos - 0.5f);
-	const int cellIndex = gridPos.x + gridPos.y * WIND_GRID_RESOLUTION;
-	
-	const int i00 = cellIndex;
-	const int i10 = cellIndex + 1;
-	const int i01 = cellIndex + WIND_GRID_RESOLUTION;
-	const int i11 = cellIndex + WIND_GRID_RESOLUTION + 1;
+	const uint2 p00 = uint2(topLeft + int2(0, 0)) % WIND_GRID_RESOLUTION;
+	const uint2 p10 = uint2(topLeft + int2(1, 0)) % WIND_GRID_RESOLUTION;
+	const uint2 p01 = uint2(topLeft + int2(0, 1)) % WIND_GRID_RESOLUTION;
+	const uint2 p11 = uint2(topLeft + int2(1, 1)) % WIND_GRID_RESOLUTION;
+
+	const int i00 = p00.x + p00.y * WIND_GRID_RESOLUTION;
+	const int i10 = p10.x + p10.y * WIND_GRID_RESOLUTION;
+	const int i01 = p01.x + p01.y * WIND_GRID_RESOLUTION;
+	const int i11 = p11.x + p11.y * WIND_GRID_RESOLUTION;
 
 	const float2 v00 = g_windGrid.Load<float2>(i00 * sizeof(float2));
 	const float2 v10 = g_windGrid.Load<float2>(i10 * sizeof(float2));
@@ -62,6 +70,7 @@ float2 sampleWindGrid(float2 pos)
 	const float2 x1 = lerp(v01, v11, bilinearFactors.x);
 	
 	return lerp(x0, x1, bilinearFactors.y);
+#endif
 }
 
 VsOutput vs_main(VsInput input)
@@ -72,8 +81,8 @@ VsOutput vs_main(VsInput input)
 	const uint		vertexColorPacked		= g_vertexColorBuffer.Load(input.vertexId * sizeof(uint));
 	const float		vertexAnimationWeight	= (vertexColorPacked >> 24) / 255.0f;
 	
+	vertexPosition.xy += sampleWindGrid(vertexPosition.xy) * vertexAnimationWeight * 0.4f;
 	vertexPosition.x += wind(g_frame.elapsedTime * 0.001f * 0.5f + vertexPosition.x * 0.8f) * vertexAnimationWeight * 0.1f;
-	vertexPosition.xy += sampleWindGrid(vertexPosition.xy) * vertexAnimationWeight * 0.5f;
 
 	output.color	= unpackVertexColor(vertexColorPacked);
 	output.position	= mul(float4(vertexPosition, 1.0), g_frame.matViewProj);
