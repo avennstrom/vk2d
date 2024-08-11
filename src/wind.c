@@ -151,9 +151,9 @@ void wind_inject(wind_t* wind, wind_injection_t injection)
 	if (x_min < 0) x_min = 0;
 	if (y_min < 0) y_min = 0;
 	
-	for (int y = y_min; y <= y_max; ++y)
+	for (int y = y_min; y < y_max; ++y)
 	{
-		for (int x = x_min; x <= x_max; ++x)
+		for (int x = x_min; x < x_max; ++x)
 		{
 			const int i = x + y * WIND_GRID_RESOLUTION;
 
