@@ -604,7 +604,7 @@ void scene_draw(
 	scene_t* scene,
 	scb_t* scb,
 	const render_context_t* rc,
-	debug_renderer_t* debugRenderer)
+	const scene_render_context_t* src)
 {
 	scb_append(scb, 0, SCB_CMD_NULL, 0);
 
@@ -637,7 +637,7 @@ void scene_draw(
 			for (size_t i = 0; i < header->count; ++i)
 			{
 				model_info_t modelInfo;
-				if (model_loader_get_model_info(&modelInfo, rc->modelLoader, draws[i].model))
+				if (model_loader_get_model_info(&modelInfo, src->modelLoader, draws[i].model))
 				{
 					// for (int partIndex = 0; partIndex < modelInfo.partCount; ++partIndex)
 					// {
@@ -677,7 +677,7 @@ void scene_draw(
 		.pointLightCount	= gpuPointLightCount,
 		.spotLightCount		= gpuSpotLightCount,
 		.drawCount			= gpuDrawCount,
-		.elapsedTime		= rc->elapsedTime,
+		.elapsedTime		= src->elapsedTime,
 	};
 
 	PushStagingMemoryFlush(rc->stagingMemory, frame->uniforms, sizeof(gpu_frame_uniforms_t));
@@ -692,7 +692,7 @@ void scene_draw(
 			{
 				// Scene Color -> Attachment Write
 				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-				.image = rc->rt->sceneColor.image,
+				.image = src->rt->sceneColor.image,
 				.srcAccessMask = VK_ACCESS_NONE,
 				.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 				.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -718,7 +718,7 @@ void scene_draw(
 		const VkRenderingAttachmentInfo colorAttachments[] = {
 			{
 				VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-				.imageView = rc->rt->sceneColor.view,
+				.imageView = src->rt->sceneColor.view,
 				.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				// .resolveImageView = backbufferView,
 				// .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -728,7 +728,7 @@ void scene_draw(
 			}};
 		const VkRenderingAttachmentInfo depthAttachment = {
 			VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-			.imageView = rc->rt->sceneDepth.view,
+			.imageView = src->rt->sceneDepth.view,
 			.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
 			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 			.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -741,17 +741,17 @@ void scene_draw(
 			.pDepthAttachment = &depthAttachment,
 			.layerCount = 1,
 			.renderArea = {
-				.extent = {rc->rt->resolution.x, rc->rt->resolution.y},
+				.extent = {src->rt->resolution.x, src->rt->resolution.y},
 			}};
 		vkCmdBeginRendering(cb, &renderingInfo);
 		{
-			SetViewportAndScissor(cb, (VkOffset2D){}, (VkExtent2D){rc->rt->resolution.x, rc->rt->resolution.y});
+			SetViewportAndScissor(cb, (VkOffset2D){}, (VkExtent2D){src->rt->resolution.x, src->rt->resolution.y});
 			
 			model_loader_info_t modelLoaderInfo;
-			model_loader_get_info(&modelLoaderInfo, rc->modelLoader);
+			model_loader_get_info(&modelLoaderInfo, src->modelLoader);
 
 			wind_render_info_t windInfo;
-			wind_get_render_info(&windInfo, rc->wind);
+			wind_get_render_info(&windInfo, src->wind);
 
 			frame->uniforms->windGridOrigin = windInfo.gridOrigin;
 
@@ -770,7 +770,7 @@ void scene_draw(
 			}
 
 			world_render_info_t worldInfo;
-			if (world_get_render_info(&worldInfo, rc->world))
+			if (world_get_render_info(&worldInfo, src->world))
 			{
 				descriptor_allocator_begin(rc->dsalloc, scene->worldDescriptorSetLayout, "World");
 				descriptor_allocator_set_uniform_buffer(rc->dsalloc, 0, frameUniformBuffer);
@@ -788,7 +788,7 @@ void scene_draw(
 			FlushDebugRenderer(
 				cb, 
 				rc->stagingMemory, 
-				debugRenderer,
+				src->debugRenderer,
 				rc->dsalloc,
 				frameUniformBuffer,
 				rc->frameIndex);

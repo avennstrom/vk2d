@@ -523,15 +523,9 @@ int main(int argc, char **argv)
 		
 		const render_context_t rc = {
 			.frameIndex = app.currentFrame,
-			.elapsedTime = (float)elapsedTime,
 			.vulkan = &vulkan,
 			.stagingMemory = &stagingMemoryContext,
 			.dsalloc = &dsalloc,
-			.rt = &rt,
-			.modelLoader = modelLoader,
-			//.terrain = terrain,
-			.world = world,
-			.wind = wind,
 		};
 
 		model_loader_update(cb, modelLoader, &rc);
@@ -561,12 +555,21 @@ int main(int argc, char **argv)
 		DrawDebugLine((debug_vertex_t){0.0f, 0.0f, 0.0f, COLOR_GREEN}, (debug_vertex_t){0.0f, 1.0f, 0.0f, COLOR_GREEN});
 		DrawDebugLine((debug_vertex_t){0.0f, 0.0f, 0.0f, COLOR_BLUE}, (debug_vertex_t){0.0f, 0.0f, 1.0f, COLOR_BLUE});
 
+		const scene_render_context_t src = {
+			.elapsedTime = (float)elapsedTime,
+			.modelLoader = modelLoader,
+			.world = world,
+			.wind = wind,
+			.debugRenderer = &debugRenderer,
+			.rt = &rt,
+		};
+
 		scene_draw(
-			cb, 
+			cb,
 			scene,
-			scb, 
+			scb,
 			&rc,
-			&debugRenderer);
+			&src);
 
 		const VkImage backbufferImage = swapchain.backbuffer[imageIndex];
 		const VkImageView backbufferView = swapchain.backbufferView[imageIndex];

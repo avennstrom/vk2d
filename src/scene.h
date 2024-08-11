@@ -8,6 +8,8 @@
 #include "staging_memory.h"
 #include "debug_renderer.h"
 #include "model_loader.h"
+#include "wind.h"
+#include "world.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -19,7 +21,23 @@ scene_t*	scene_create(vulkan_t *vulkan);
 void		scene_destroy(scene_t *scene);
 int			scene_alloc_staging_mem(staging_memory_allocator_t* allocator, scene_t *scene);
 scb_t*		scene_begin(scene_t *scene);
-void		scene_draw(VkCommandBuffer cb, scene_t* scene, scb_t* scb, const render_context_t* rc, debug_renderer_t* debugRenderer);
+
+typedef struct scene_render_context
+{
+	float				elapsedTime;
+	model_loader_t*		modelLoader;
+	world_t*			world;
+	wind_t*				wind;
+	debug_renderer_t*	debugRenderer;
+	render_targets_t*	rt;
+} scene_render_context_t;
+
+void scene_draw(
+	VkCommandBuffer cb,
+	scene_t* scene,
+	scb_t* scb,
+	const render_context_t* rc,
+	const scene_render_context_t* src);
 
 typedef struct scb_camera {
 	mat4 transform;
