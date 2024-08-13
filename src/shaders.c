@@ -19,6 +19,8 @@ SHADER_BLOB(world_vs);
 SHADER_BLOB(world_fs);
 SHADER_BLOB(model_vs);
 SHADER_BLOB(model_fs);
+SHADER_BLOB(particle_vs);
+SHADER_BLOB(particle_fs);
 
 shader_library_t g_shaders = {};
 
@@ -54,6 +56,8 @@ int InitShaderLibrary(vulkan_t* vulkan)
 	g_shaders.modules[SHADER_WORLD_FRAG] = createShaderModule(vulkan, SHADER_ARG_HELPER(world_fs));
 	g_shaders.modules[SHADER_MODEL_VERT] = createShaderModule(vulkan, SHADER_ARG_HELPER(model_vs));
 	g_shaders.modules[SHADER_MODEL_FRAG] = createShaderModule(vulkan, SHADER_ARG_HELPER(model_fs));
+	g_shaders.modules[SHADER_PARTICLE_VERT] = createShaderModule(vulkan, SHADER_ARG_HELPER(particle_vs));
+	g_shaders.modules[SHADER_PARTICLE_FRAG] = createShaderModule(vulkan, SHADER_ARG_HELPER(particle_fs));
 	return 0;
 }
 

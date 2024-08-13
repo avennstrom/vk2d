@@ -8,6 +8,7 @@ SHADER_OBJ := ${SHADER_OBJ} obj/world.vs.spo obj/world.fs.spo
 SHADER_OBJ := ${SHADER_OBJ} obj/model.vs.spo obj/model.fs.spo
 SHADER_OBJ := ${SHADER_OBJ} obj/debug.vs.spo obj/debug.fs.spo
 SHADER_OBJ := ${SHADER_OBJ} obj/composite.vs.spo obj/composite.fs.spo
+SHADER_OBJ := ${SHADER_OBJ} obj/particle.vs.spo obj/particle.fs.spo
 
 .PHONY: shaderc run-converter
 .SECONDARY: $(SHADER_SPV)

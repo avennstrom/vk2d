@@ -14,7 +14,7 @@
 #include <stdbool.h>
 #include <float.h>
 
-#define PLAYER_SPEED		0.008f
+#define PLAYER_SPEED		0.006f
 #define PLAYER_SPEED_BOOST	4.0f
 #define PLAYER_GRAVITY		0.00005f
 #define PLAYER_JUMP_VEL		0.015f
@@ -29,6 +29,7 @@ typedef struct player {
 	vec2	vel;
 	vec2	size;
 	bool	isGrounded;
+	vec2	lastFootstep;
 } player_t;
 
 enum {
@@ -39,6 +40,7 @@ enum {
 typedef struct game {
 	world_t*				world;
 	wind_t*					wind;
+	particles_t*			particles;
 	window_t*				window;
 	const model_loader_t*	modelLoader;
 	int						state;
@@ -54,7 +56,7 @@ typedef struct game {
 	bool					buttonstate[2];
 } game_t;
 
-game_t* game_create(window_t* window, const model_loader_t* modelLoader, world_t* world, wind_t* wind)
+game_t* game_create(window_t* window, const model_loader_t* modelLoader, world_t* world, wind_t* wind, particles_t* particles)
 {
 	game_t* game = calloc(1, sizeof(game_t));
 	if (game == NULL) {
@@ -63,6 +65,7 @@ game_t* game_create(window_t* window, const model_loader_t* modelLoader, world_t
 
 	game->world			= world;
 	game->wind			= wind;
+	game->particles		= particles;
 	game->window		= window;
 	game->modelLoader	= modelLoader;
 
@@ -185,6 +188,19 @@ void game_tick(game_t* game, uint2 resolution)
 		case GameState_Play:
 		{
 			TickPlayerMovement(game, DELTA_TIME_MS);
+		}
+	}
+
+	{
+		player_t* player = &game->player;
+		if (player->isGrounded && vec2_distance(player->pos, player->lastFootstep) > 1.0f)
+		{
+			particles_spawn(game->particles, (particle_spawn_t){
+				.effect = PARTICLE_EFFECT_FOOTSTEP_DUST,
+				.pos = player->pos,
+			});
+
+			player->lastFootstep = player->pos;
 		}
 	}
 

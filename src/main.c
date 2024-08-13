@@ -22,6 +22,7 @@
 #include "world.h"
 #include "editor.h"
 #include "wind.h"
+#include "particles.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -336,6 +337,7 @@ int main(int argc, char **argv)
 	world_t* world = world_create(&vulkan);
 	//terrain_t* terrain = terrain_create(&vulkan);
 	wind_t* wind = wind_create(&vulkan);
+	particles_t* particles = particles_create(&vulkan);
 
 	{
 		FILE* f = fopen("world.bin", "rb");
@@ -354,11 +356,12 @@ int main(int argc, char **argv)
 	//terrain_alloc_staging_mem(&staging_allocator, terrain);
 	world_alloc_staging_mem(&staging_allocator, world);
 	wind_alloc_staging_mem(&staging_allocator, wind);
+	particles_alloc_staging_mem(&staging_allocator, particles);
 
 	staging_memory_allocation_t stagingAllocation;
 	FinalizeStagingMemoryAllocator(&stagingAllocation, &staging_allocator);
 
-	game_t* game = game_create(window, modelLoader, world, wind);
+	game_t* game = game_create(window, modelLoader, world, wind, particles);
 	editor_t* editor = editor_create(world);
 
 	delta_timer_t deltaTimer;
@@ -499,6 +502,7 @@ int main(int argc, char **argv)
 			}
 
 			wind_tick(wind);
+			particles_tick(particles);
 		}
 
 		MakeCurrentDebugRenderer(&debugRenderer);
@@ -543,6 +547,7 @@ int main(int argc, char **argv)
 		//terrain_update(cb, terrain, &rc);
 		world_update(world, cb, &rc);
 		wind_update(cb, wind, &rc);
+		particles_render(particles, &rc);
 
 		{
 			const VkMemoryBarrier memoryBarriers[] = {
@@ -571,6 +576,7 @@ int main(int argc, char **argv)
 			.modelLoader = modelLoader,
 			.world = world,
 			.wind = wind,
+			.particles = particles,
 			.debugRenderer = &debugRenderer,
 			.rt = &rt,
 		};

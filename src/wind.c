@@ -115,7 +115,7 @@ void wind_update(VkCommandBuffer cb, wind_t* wind, const render_context_t* rc)
 		);
 	}
 #endif
-#if 1
+#if 0
 	for (int y = 0; y < WIND_GRID_RESOLUTION; ++y)
 	{
 		for (int x = 0; x < WIND_GRID_RESOLUTION; ++x)

@@ -2,6 +2,11 @@
 
 #include <math.h>
 
+float lerpf(float a, float b, float t)
+{
+	return a + t * (b - a);
+}
+
 vec2 vec2_add(vec2 a, vec2 b)
 {
 	return (vec2){ a.x + b.x, a.y + b.y };
@@ -20,6 +25,11 @@ vec2 vec2_mul(vec2 a, vec2 b)
 float vec2_length(vec2 v)
 {
 	return sqrtf(vec2_dot(v, v));
+}
+
+float vec2_distance(vec2 a, vec2 b)
+{
+	return vec2_length(vec2_sub(a, b));
 }
 
 vec2 vec2_normalize(vec2 v)

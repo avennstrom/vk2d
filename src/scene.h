@@ -10,6 +10,7 @@
 #include "model_loader.h"
 #include "wind.h"
 #include "world.h"
+#include "particles.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -28,6 +29,7 @@ typedef struct scene_render_context
 	model_loader_t*		modelLoader;
 	world_t*			world;
 	wind_t*				wind;
+	particles_t*		particles;
 	debug_renderer_t*	debugRenderer;
 	render_targets_t*	rt;
 } scene_render_context_t;

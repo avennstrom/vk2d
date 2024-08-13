@@ -21,3 +21,8 @@ dxc -D__HLSL__ -Fo obj/composite.vs.spv -T vs_6_8 -spirv shaders/composite.hlsl 
 dxc -D__HLSL__ -Fo obj/composite.fs.spv -T ps_6_8 -spirv shaders/composite.hlsl -E fs_main
 ld -z noexecstack -r -b binary -o obj/composite.vs.spo obj/composite.vs.spv
 ld -z noexecstack -r -b binary -o obj/composite.fs.spo obj/composite.fs.spv
+
+dxc -D__HLSL__ -Fo obj/particle.vs.spv -T vs_6_8 -spirv shaders/particle.hlsl -E vs_main
+dxc -D__HLSL__ -Fo obj/particle.fs.spv -T ps_6_8 -spirv shaders/particle.hlsl -E fs_main
+ld -z noexecstack -r -b binary -o obj/particle.vs.spo obj/particle.vs.spv
+ld -z noexecstack -r -b binary -o obj/particle.fs.spo obj/particle.fs.spv
