@@ -56,6 +56,15 @@ vec2 vec2_lerp(vec2 a, vec2 b, float t)
 	};
 }
 
+vec2 vec2_frac(vec2 v)
+{
+	float dummy;
+	return (vec2){
+		modff(v.x, &dummy),
+		modff(v.y, &dummy),
+	};
+}
+
 vec3 vec3_add(vec3 a, vec3 b)
 {
 	return (vec3){ a.x + b.x, a.y + b.y, a.z + b.z };

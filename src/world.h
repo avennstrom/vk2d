@@ -4,6 +4,7 @@
 #include "render_context.h"
 #include "staging_memory.h"
 #include "types.h"
+#include "particles.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -12,11 +13,12 @@
 
 typedef struct world world_t;
 
-world_t* world_create(vulkan_t* vulkan);
+world_t* world_create(vulkan_t* vulkan, particles_t* particles);
 void world_destroy(world_t* world);
 
 void world_alloc_staging_mem(staging_memory_allocator_t* allocator, world_t* world);
 
+void world_tick(world_t* world);
 void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc);
 
 int world_serialize(world_t* world, FILE* f);

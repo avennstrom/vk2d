@@ -334,10 +334,10 @@ int main(int argc, char **argv)
 	scene_t* scene = scene_create(&vulkan);
 	composite_t* composite = composite_create(&vulkan);
 	model_loader_t* modelLoader = model_loader_create(&vulkan, &gameResource, &content);
-	world_t* world = world_create(&vulkan);
 	//terrain_t* terrain = terrain_create(&vulkan);
 	wind_t* wind = wind_create(&vulkan);
-	particles_t* particles = particles_create(&vulkan);
+	particles_t* particles = particles_create(&vulkan, wind);
+	world_t* world = world_create(&vulkan, particles);
 
 	{
 		FILE* f = fopen("world.bin", "rb");
@@ -495,6 +495,8 @@ int main(int argc, char **argv)
 		while (tickAccumulator >= DELTA_TIME_MS)
 		{
 			tickAccumulator -= DELTA_TIME_MS;
+
+			world_tick(world);
 
 			if (appMode == APP_MODE_GAME)
 			{

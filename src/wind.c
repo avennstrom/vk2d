@@ -137,22 +137,6 @@ void wind_update(VkCommandBuffer cb, wind_t* wind, const render_context_t* rc)
 			);
 		}
 	}
-	// for (int i = 0; i < WIND_GRID_CELL_COUNT; ++i)
-	// {
-	// 	const int x = i % WIND_GRID_RESOLUTION;
-	// 	const int y = i / WIND_GRID_RESOLUTION;
-	// 	const vec2 vel = wind->gridVel[i];
-		
-	// 	const vec2 center = {
-	// 		x*WIND_GRID_CELL_SIZE + WIND_GRID_CELL_SIZE*0.5f,
-	// 		y*WIND_GRID_CELL_SIZE + WIND_GRID_CELL_SIZE*0.5f
-	// 	};
-		
-	// 	DrawDebugLine(
-	// 		(debug_vertex_t){.x = center.x, .y = center.y, .color = 0xff0000ff},
-	// 		(debug_vertex_t){.x = center.x + vel.x, .y = center.y + vel.y, .color = 0xff0000ff}
-	// 	);
-	// }
 #endif
 
 	wind_frame_t* frame = &wind->frames[rc->frameIndex];
@@ -202,6 +186,39 @@ void wind_set_focus(wind_t* wind, vec2 pos)
 {
 	wind->gridOrigin.x = (pos.x / WIND_GRID_CELL_SIZE);
 	wind->gridOrigin.y = (pos.y / WIND_GRID_CELL_SIZE);
+}
+
+vec2 wind_sample(const wind_t* wind, vec2 pos)
+{
+	const vec2 floatGridPos = vec2_scale(pos, 1.0f / WIND_GRID_CELL_SIZE);
+#if 1
+	const vec2 bilinearFactors = vec2_frac(floatGridPos);
+	const int dx = (int)floorf(floatGridPos.x - 0.5f);
+	const int dy = (int)floorf(floatGridPos.y - 0.5f);
+	
+	const int i00 = (((uint)(dx+0)) % WIND_GRID_RESOLUTION) + (((uint)(dy+0)) % WIND_GRID_RESOLUTION) * WIND_GRID_RESOLUTION;
+	const int i10 = (((uint)(dx+1)) % WIND_GRID_RESOLUTION) + (((uint)(dy+0)) % WIND_GRID_RESOLUTION) * WIND_GRID_RESOLUTION;
+	const int i01 = (((uint)(dx+0)) % WIND_GRID_RESOLUTION) + (((uint)(dy+1)) % WIND_GRID_RESOLUTION) * WIND_GRID_RESOLUTION;
+	const int i11 = (((uint)(dx+1)) % WIND_GRID_RESOLUTION) + (((uint)(dy+1)) % WIND_GRID_RESOLUTION) * WIND_GRID_RESOLUTION;
+
+	const vec2 v00 = wind->gridVel[i00];
+	const vec2 v10 = wind->gridVel[i10];
+	const vec2 v01 = wind->gridVel[i01];
+	const vec2 v11 = wind->gridVel[i11];
+	
+	const vec2 x0 = vec2_lerp(v00, v10, bilinearFactors.x);
+	const vec2 x1 = vec2_lerp(v01, v11, bilinearFactors.x);
+	
+	return vec2_lerp(x0, x1, bilinearFactors.y);
+#else
+	const int dx = (int)floorf(floatGridPos.x);
+	const int dy = (int)floorf(floatGridPos.y);
+	
+	const int i = (((uint)dx) % WIND_GRID_RESOLUTION) + (((uint)dy) % WIND_GRID_RESOLUTION) * WIND_GRID_RESOLUTION;
+
+	const vec2 vel = wind->gridVel[i];
+	return vel;
+#endif
 }
 
 void wind_get_render_info(wind_render_info_t* info, wind_t* wind)

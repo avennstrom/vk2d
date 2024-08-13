@@ -25,6 +25,8 @@ typedef struct wind_injection
 void wind_inject(wind_t* wind, wind_injection_t injection);
 void wind_set_focus(wind_t* wind, vec2 pos);
 
+vec2 wind_sample(const wind_t* wind, vec2 pos);
+
 typedef struct wind_render_info
 {
 	VkBuffer	gridBuffer;

@@ -195,8 +195,7 @@ void game_tick(game_t* game, uint2 resolution)
 		player_t* player = &game->player;
 		if (player->isGrounded && vec2_distance(player->pos, player->lastFootstep) > 1.0f)
 		{
-			particles_spawn(game->particles, (particle_spawn_t){
-				.effect = PARTICLE_EFFECT_FOOTSTEP_DUST,
+			particles_spawn(game->particles, PARTICLE_EFFECT_FOOTSTEP_DUST, (particle_spawn_t){
 				.pos = player->pos,
 			});
 

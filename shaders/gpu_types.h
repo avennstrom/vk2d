@@ -4,7 +4,7 @@
 #define MAX_POINT_LIGHTS (64)
 
 #define WIND_GRID_RESOLUTION	(64)
-#define WIND_GRID_CELL_SIZE		(0.5f)
+#define WIND_GRID_CELL_SIZE		(0.4f)
 
 #ifdef __STDC__
 typedef struct gpu_draw_t gpu_draw_t;

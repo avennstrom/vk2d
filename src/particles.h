@@ -4,10 +4,11 @@
 #include "vulkan.h"
 #include "staging_memory.h"
 #include "render_context.h"
+#include "wind.h"
 
 typedef struct particles particles_t;
 
-particles_t* particles_create(vulkan_t* vulkan);
+particles_t* particles_create(vulkan_t* vulkan, wind_t* wind);
 void particles_destroy(particles_t* particles);
 
 void particles_alloc_staging_mem(staging_memory_allocator_t* allocator, particles_t* particles);
@@ -18,16 +19,16 @@ void particles_render(particles_t* particles, const render_context_t* rc);
 typedef enum particle_effect
 {
 	PARTICLE_EFFECT_FOOTSTEP_DUST,
+	PARTICLE_EFFECT_AMBIENT_POLLEN,
 	PARTICLE_EFFECT_COUNT,
 } particle_effect_t;
 
 typedef struct particle_spawn
 {
-	particle_effect_t	effect;
-	vec2				pos;
+	vec2	pos;
 } particle_spawn_t;
 
-void particles_spawn(particles_t* particles, particle_spawn_t spawn);
+void particles_spawn(particles_t* particles, particle_effect_t effect, particle_spawn_t spawn);
 
 typedef struct particles_render_info
 {

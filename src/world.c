@@ -3,6 +3,7 @@
 #include "debug_renderer.h"
 #include "vec.h"
 #include "util.h"
+#include "rng.h"
 
 #include <stdlib.h>
 #include <math.h>
@@ -32,6 +33,7 @@ typedef struct world_colliders
 typedef struct world
 {
 	vulkan_t*			vulkan;
+	particles_t*		particles;
 	world_state_t		state;
 	uint				stagingCounter;
 
@@ -48,6 +50,9 @@ typedef struct world
 
 	editor_polygon_t	polygon;
 	world_colliders_t	colliders;
+
+	uint				rng;
+	float				pollenTimer;
 } world_t;
 
 typedef struct triangle
@@ -59,7 +64,7 @@ static void triangle_collider_debug_draw(triangle_collider_t* t);
 static void editor_polygon_debug_draw(editor_polygon_t* p);
 static void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCount, const editor_polygon_t* polygon);
 
-world_t* world_create(vulkan_t* vulkan)
+world_t* world_create(vulkan_t* vulkan, particles_t* particles)
 {
 	world_t* world = calloc(1, sizeof(world_t));
 	if (world == NULL)
@@ -67,7 +72,8 @@ world_t* world_create(vulkan_t* vulkan)
 		return NULL;
 	}
 
-	world->vulkan = vulkan;
+	world->vulkan		= vulkan;
+	world->particles	= particles;
 	
 	world->indexBuffer = CreateBuffer(
 		&world->indexBufferMemory,
@@ -290,6 +296,34 @@ static void fill_primitive_data(primitive_context_t* ctx, const editor_polygon_t
 			const float t = (rand() / (float)RAND_MAX);
 			const vec2 p = vec2_lerp(p0, p1, t);
 			grow_plant(ctx, p, d);
+		}
+	}
+}
+
+void world_tick(world_t* world)
+{
+	world->pollenTimer += DELTA_TIME_MS;
+	if (world->pollenTimer > 20.0f)
+	{
+		world->pollenTimer -= 20.0f;
+
+		const editor_polygon_t* polygon = &world->polygon;
+
+		const uint vertexIndex = lcg_rand(&world->rng) % polygon->vertexCount;
+
+		const vec2 a = polygon->vertexPosition[vertexIndex];
+		const vec2 b = polygon->vertexPosition[(vertexIndex + 1) % polygon->vertexCount];
+
+		const vec2 d = vec2_normalize(vec2_sub(b, a));
+		const vec2 n = {-d.y, d.x};
+		
+		if (n.y > 0.0f)
+		{
+			const float t = lcg_randf(&world->rng);
+
+			particles_spawn(world->particles, PARTICLE_EFFECT_AMBIENT_POLLEN, (particle_spawn_t){
+				.pos = vec2_lerp(a, b, t),
+			});
 		}
 	}
 }

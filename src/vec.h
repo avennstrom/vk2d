@@ -13,6 +13,7 @@ vec2 vec2_normalize(vec2 v);
 float vec2_dot(vec2 a, vec2 b);
 vec2 vec2_scale(vec2 v, float s);
 vec2 vec2_lerp(vec2 a, vec2 b, float t);
+vec2 vec2_frac(vec2 v);
 
 vec3 vec3_add(vec3 a, vec3 b);
 vec3 vec3_sub(vec3 a, vec3 b);

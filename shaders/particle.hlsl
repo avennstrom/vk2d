@@ -42,7 +42,7 @@ VsOutput vs_main(VsInput input)
 
 	const gpu_particle_t particle = g_particles.Load<gpu_particle_t>(particleIndex * sizeof(gpu_particle_t));
 
-	const float depth = 0.1f;
+	const float depth = 0.0f;
 	const float size = particle.size;
 	const float2 center = particle.center;
 	
