@@ -254,12 +254,12 @@ static void particles_footstep_dust_tick(particle_effect_state_t* state, const p
 
 	for (uint i = 0; i < state->count;)
 	{
-		footstep_dust_particle_t* dustParticle = &particles[i];
-		dustParticle->pos = vec2_add(dustParticle->pos, vec2_scale(dustParticle->vel, DELTA_TIME_MS));
-		dustParticle->vel = vec2_scale(dustParticle->vel, 0.9f);
-		dustParticle->age += DELTA_TIME_MS;
+		footstep_dust_particle_t* p = &particles[i];
+		p->pos = vec2_add(p->pos, vec2_scale(p->vel, DELTA_TIME_MS));
+		p->vel = vec2_scale(p->vel, 0.9f);
+		p->age += DELTA_TIME_MS;
 		
-		const bool isDead = dustParticle->age >= dustParticle->lifetime;
+		const bool isDead = p->age >= p->lifetime;
 		if (isDead)
 		{
 			particles[i] = particles[--state->count];
@@ -277,12 +277,12 @@ static void particles_footstep_dust_render(gpu_particle_t* gpuParticles, const p
 
 	for (uint i = 0; i < state->count; ++i)
 	{
-		const footstep_dust_particle_t* dustParticle = &particles[i];
+		const footstep_dust_particle_t* p = &particles[i];
 
-		const float tage = dustParticle->age / dustParticle->lifetime;
+		const float tage = p->age / p->lifetime;
 
 		gpuParticles[i] = (gpu_particle_t){
-			.center = dustParticle->pos,
+			.center = p->pos,
 			.color = 0xff001020,
 			.sizeAndLayer = pack_size_and_layer(lerpf(0.2f, 0.0f, tage), 0),
 		};
@@ -320,13 +320,13 @@ static void particles_ambient_pollen_tick(particle_effect_state_t* state, const 
 
 	for (uint i = 0; i < state->count;)
 	{
-		ambient_pollen_particle_t* dustParticle = &particles[i];
-		particle_sample_wind(&dustParticle->pos, 0.004f, external);
-		dustParticle->pos = vec2_add(dustParticle->pos, vec2_scale(dustParticle->vel, DELTA_TIME_MS));
-		dustParticle->pos.x += sinf(dustParticle->age * 0.0025f) * DELTA_TIME_MS * 0.0004f;
-		dustParticle->age += DELTA_TIME_MS;
+		ambient_pollen_particle_t* p = &particles[i];
+		particle_sample_wind(&p->pos, 0.004f, external);
+		p->pos = vec2_add(p->pos, vec2_scale(p->vel, DELTA_TIME_MS));
+		p->pos.x += sinf(p->age * 0.0025f) * DELTA_TIME_MS * 0.0004f;
+		p->age += DELTA_TIME_MS;
 		
-		const bool isDead = dustParticle->age >= dustParticle->lifetime;
+		const bool isDead = p->age >= p->lifetime;
 		if (isDead)
 		{
 			particles[i] = particles[--state->count];
@@ -344,12 +344,12 @@ static void particles_ambient_pollen_render(gpu_particle_t* gpuParticles, const 
 
 	for (uint i = 0; i < state->count; ++i)
 	{
-		const ambient_pollen_particle_t* dustParticle = &particles[i];
+		const ambient_pollen_particle_t* p = &particles[i];
 
-		const float tage = dustParticle->age / dustParticle->lifetime;
+		const float tage = p->age / p->lifetime;
 
 		gpuParticles[i] = (gpu_particle_t){
-			.center = dustParticle->pos,
+			.center = p->pos,
 			.color = 0xffffffff,
 			.sizeAndLayer = pack_size_and_layer(lerpf(0.08f, 0.0f, tage), 1),
 			//.size = 0.05f,
