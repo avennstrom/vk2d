@@ -414,7 +414,7 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 		}
 	}
 	
-#if 0
+#if 1
 	for (size_t i = 0; i < world->colliders.triangleCount; ++i)
 	{
 		triangle_collider_debug_draw(&world->colliders.triangles[i]);

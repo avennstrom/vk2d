@@ -23,6 +23,16 @@ float3 unpackParticleColor(uint packed)
 	return color;
 }
 
+float unpackParticleSize(uint packed)
+{
+	return (packed & 0xffff) / (float)0xffff;
+}
+
+uint unpackParticleLayer(uint packed)
+{
+	return (packed >> 16) & 0xff;
+}
+
 VsOutput vs_main(VsInput input)
 {
 	const uint particleIndex = input.vertexId / 6;
@@ -42,16 +52,17 @@ VsOutput vs_main(VsInput input)
 
 	const gpu_particle_t particle = g_particles.Load<gpu_particle_t>(particleIndex * sizeof(gpu_particle_t));
 
-	const float depth = 0.0f;
-	const float size = particle.size;
+	const float depth = unpackParticleLayer(particle.sizeAndLayer) / (float)0xffff;
+	const float size = unpackParticleSize(particle.sizeAndLayer);
 	const float2 center = particle.center;
 	
 	const float2 position = center + corner * size * 0.5f;
 
 	VsOutput output = (VsOutput)0;
 	output.color = unpackParticleColor(particle.color);
-	output.position	= mul(float4(position, depth, 1.0), g_frame.matViewProj);
+	output.position	= mul(float4(position, 0.0f, 1.0), g_frame.matViewProj);
 
+	output.position.z = depth;
 	output.position.y *= -1;
 	return output;
 }

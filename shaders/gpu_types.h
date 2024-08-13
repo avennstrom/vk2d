@@ -56,7 +56,7 @@ struct gpu_frame_uniforms_t
 struct gpu_particle_t
 {
 	vec2	center;
-	float	size;
+	uint	sizeAndLayer; // [0:15] size, [16:23] layer, [24:31] unused
 	uint	color;
 };
 

@@ -100,6 +100,13 @@ typedef struct particles
 	particle_effect_state_t	effectState[PARTICLE_EFFECT_COUNT];
 } particles_t;
 
+static uint pack_size_and_layer(float size, uint layer)
+{
+	assert(size >= 0.0f && size <= 1.0f);
+	assert(layer <= 0xff);
+	return (uint)(size * (float)0xffff) | (layer << 16);
+}
+
 particles_t* particles_create(vulkan_t* vulkan, wind_t* wind)
 {
 	particles_t* particles = calloc(1, sizeof(particles_t));
@@ -184,7 +191,7 @@ void particles_render(particles_t* particles, const render_context_t* rc)
 		gpuParticles[i] = (gpu_particle_t){
 			.center.x = sinf(particles->elapsedTime * t) * x,
 			.center.y = cosf(particles->elapsedTime * t) * y,
-			.size = 0.05f + sr * 0.05f,
+			.sizeAndLayer = pack_size_and_layer(0.05f + sr * 0.05f, 0),
 			.color = 0xff000000 | (int)(r * 255.0f) | ((int)((1.0f - r) * 255.0f) << 8),
 		};
 	}
@@ -234,7 +241,7 @@ static void particles_footstep_dust_spawn(particle_effect_state_t* state, partic
 			.pos.x = spawn.pos.x + x * 0.1f,
 			.pos.y = spawn.pos.y,
 			.vel.x = x * 0.001f,
-			.vel.y = lcg_randf_range(&state->rng, 0.0005f, 0.004f),
+			.vel.y = lcg_randf_range(&state->rng, 0.0005f, 0.001f),
 		};
 	}
 	
@@ -277,7 +284,7 @@ static void particles_footstep_dust_render(gpu_particle_t* gpuParticles, const p
 		gpuParticles[i] = (gpu_particle_t){
 			.center = dustParticle->pos,
 			.color = 0xff001020,
-			.size = lerpf(0.3f, 0.0f, tage),
+			.sizeAndLayer = pack_size_and_layer(lerpf(0.2f, 0.0f, tage), 0),
 		};
 	}
 }
@@ -302,6 +309,11 @@ static void particles_ambient_pollen_spawn(particle_effect_state_t* state, parti
 	state->count += spawnCount;
 }
 
+static void particle_sample_wind(vec2* pos, float amount, const particle_tick_external_state_t* external)
+{
+	*pos = vec2_add(*pos, vec2_scale(wind_sample(external->wind, *pos), amount * DELTA_TIME_MS));
+}
+
 static void particles_ambient_pollen_tick(particle_effect_state_t* state, const particle_tick_external_state_t* external)
 {
 	ambient_pollen_particle_t* particles = (ambient_pollen_particle_t*)state->particles;
@@ -309,12 +321,9 @@ static void particles_ambient_pollen_tick(particle_effect_state_t* state, const 
 	for (uint i = 0; i < state->count;)
 	{
 		ambient_pollen_particle_t* dustParticle = &particles[i];
-		dustParticle->pos = vec2_add(dustParticle->pos, vec2_scale(wind_sample(external->wind, dustParticle->pos), 0.004f * DELTA_TIME_MS));
+		particle_sample_wind(&dustParticle->pos, 0.004f, external);
 		dustParticle->pos = vec2_add(dustParticle->pos, vec2_scale(dustParticle->vel, DELTA_TIME_MS));
-
 		dustParticle->pos.x += sinf(dustParticle->age * 0.0025f) * DELTA_TIME_MS * 0.0004f;
-		//dustParticle->pos
-		//dustParticle->vel = vec2_scale(dustParticle->vel, 0.9f);
 		dustParticle->age += DELTA_TIME_MS;
 		
 		const bool isDead = dustParticle->age >= dustParticle->lifetime;
@@ -342,7 +351,7 @@ static void particles_ambient_pollen_render(gpu_particle_t* gpuParticles, const 
 		gpuParticles[i] = (gpu_particle_t){
 			.center = dustParticle->pos,
 			.color = 0xffffffff,
-			.size = lerpf(0.08f, 0.0f, tage),
+			.sizeAndLayer = pack_size_and_layer(lerpf(0.08f, 0.0f, tage), 1),
 			//.size = 0.05f,
 		};
 	}
