@@ -34,6 +34,12 @@ typedef struct world_render_info
 
 bool world_get_render_info(world_render_info_t* info, world_t* world);
 
+typedef struct editor_polygon
+{
+	uint	vertexCount;
+	vec2	vertexPosition[POLYGON_MAX_VERTICES];
+} editor_polygon_t;
+
 typedef struct triangle_collider
 {
 	vec2 a;
@@ -41,19 +47,17 @@ typedef struct triangle_collider
 	vec2 c;
 } triangle_collider_t;
 
+_Static_assert(sizeof(triangle_collider_t) == 24);
+
 typedef struct world_collision_info
 {
 	uint32_t					triangleCount;
 	const triangle_collider_t*	triangles;
+	uint						polygonCount;
+	editor_polygon_t*			polygons;
 } world_collision_info_t;
 
 void world_get_collision_info(world_collision_info_t* info, world_t* world);
-
-typedef struct editor_polygon
-{
-	uint	vertexCount;
-	vec2	vertexPosition[POLYGON_MAX_VERTICES];
-} editor_polygon_t;
 
 typedef struct world_edit_info
 {

@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <float.h>
 #include <string.h>
+#include <sys/select.h>
 
 #include <vulkan/vulkan.h>
 
@@ -490,6 +491,8 @@ int main(int argc, char **argv)
 		double elapsedTime;
 		delta_timer_capture(&deltaTime, &elapsedTime, &deltaTimer);
 
+		MakeCurrentDebugRenderer(&debugRenderer);
+
 		tickAccumulator += deltaTime;
 
 		while (tickAccumulator >= DELTA_TIME_MS)
@@ -507,7 +510,10 @@ int main(int argc, char **argv)
 			particles_tick(particles);
 		}
 
-		MakeCurrentDebugRenderer(&debugRenderer);
+		{
+			struct timeval tv = {.tv_usec = 20 * 1000};
+			select(0, NULL, NULL, NULL, &tv);
+		}
 
 		//
 		// ---- render ----

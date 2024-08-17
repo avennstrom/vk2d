@@ -22,7 +22,7 @@ obj:
 	@mkdir -p obj
 
 obj/%.o: src/%.c | obj
-	$(CC) -std=c11 -I${VULKAN_SDK}/include -Werror -g -MMD -MF $@.d -c -o $@ $<
+	$(CC) -std=c11 -D_POSIX_C_SOURCE=200809L -I${VULKAN_SDK}/include -Werror -g -MMD -MF $@.d -c -o $@ $<
 
 obj/%.spv: shaders/%
 	glslangValidator -V -o $@ $^

@@ -273,7 +273,7 @@ static int CreateDebugPipeline(
 	const VkPipelineRasterizationStateCreateInfo rasterizer = {
 		VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 		.cullMode = VK_CULL_MODE_NONE,
-		.lineWidth = 1.0f,
+		.lineWidth = 4.0f,
 	};
 
 	const VkPipelineMultisampleStateCreateInfo multisampling = {

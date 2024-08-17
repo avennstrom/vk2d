@@ -484,6 +484,8 @@ void world_get_collision_info(world_collision_info_t* info, world_t* world)
 {
 	info->triangleCount	= world->colliders.triangleCount;
 	info->triangles		= world->colliders.triangles;
+	info->polygonCount	= 1;
+	info->polygons		= &world->polygon;
 }
 
 void world_get_edit_info(world_edit_info_t* info, world_t* world)
