@@ -245,7 +245,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	uint2 resolution = {1280, 860};
+	uint2 resolution = {1920, 1080};
 
 	window_t* window = window_create(resolution);
 	if (window == NULL)
@@ -510,10 +510,12 @@ int main(int argc, char **argv)
 			particles_tick(particles);
 		}
 
+#if 1
 		{
 			struct timeval tv = {.tv_usec = 20 * 1000};
 			select(0, NULL, NULL, NULL, &tv);
 		}
+#endif
 
 		//
 		// ---- render ----
