@@ -26,6 +26,7 @@ enum key_code {
 	KEY_SHIFT,
 	KEY_DELETE,
 	KEY_F1,
+	KEY_PAUSE,
 };
 
 enum button {

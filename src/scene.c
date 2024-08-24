@@ -936,7 +936,7 @@ void scene_draw(
 				vkCmdDraw(cb, 6 * particleInfo.particleCount, 1, 0, 0);
 			}
 			
-			FlushDebugRenderer(
+			debug_renderer_flush(
 				cb, 
 				rc->stagingMemory, 
 				src->debugRenderer,

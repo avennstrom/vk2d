@@ -17,11 +17,61 @@
 
 #define MAX_FRAME_VERTICES	(1024 * 1024)
 
+typedef struct debug_renderer_frame {
+	VkBuffer		vertexBuffer;
+	debug_vertex_t*	vertices;
+} debug_renderer_frame_t;
+
+typedef struct debug_renderer_buffer
+{
+	size_t					maxPoints;
+	size_t					maxLines;
+	size_t					maxTriangles;
+
+	debug_vertex_t*			pointVertices;
+	size_t					pointCount;
+	debug_vertex_t*			lineVertices;
+	size_t					lineCount;
+	debug_vertex_t*			triangleVertices;
+	size_t					triangleCount;
+} debug_renderer_buffer_t;
+
+typedef struct debug_renderer
+{
+	debug_renderer_frame_t	frames[FRAME_COUNT];
+	
+	VkDescriptorSetLayout	descriptorSetLayout;
+	VkPipelineLayout		pipelineLayout;
+	VkPipeline				pointPipeline;
+	VkPipeline				linePipeline;
+	VkPipeline				trianglePipeline;
+
+	// draw state
+	debug_renderer_buffer_t	buffers[DEBUG_RENDERER_BUFFER_COUNT];
+} debug_renderer_t;
+
 static int CreateDebugPipeline(VkPipeline* pipeline, vulkan_t* vulkan, VkPipelineLayout pipelineLayout, VkPrimitiveTopology topology);
 
-int debug_renderer_create(debug_renderer_t* debugRenderer, vulkan_t* vulkan, const debug_renderer_config_t* config)
+static int debug_renderer_buffer_alloc(debug_renderer_buffer_t* buffer, const debug_renderer_config_t* config)
+{
+	buffer->maxPoints			= config->maxPoints;
+	buffer->maxLines			= config->maxLines;
+	buffer->maxTriangles		= config->maxTriangles;
+
+	buffer->pointVertices = calloc(config->maxPoints, sizeof(debug_vertex_t));
+	buffer->lineVertices = calloc(config->maxLines * 2, sizeof(debug_vertex_t));
+	buffer->triangleVertices = calloc(config->maxTriangles * 3, sizeof(debug_vertex_t));
+}
+
+debug_renderer_t* debug_renderer_create(vulkan_t* vulkan, const debug_renderer_config_t* config)
 {
 	int r;
+
+	debug_renderer_t* debugRenderer = calloc(1, sizeof(debug_renderer_t));
+	if (debugRenderer == NULL)
+	{
+		return NULL;
+	}
 
 	const VkDescriptorSetLayoutBinding bindings[] = {
 		{ 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
@@ -32,7 +82,7 @@ int debug_renderer_create(debug_renderer_t* debugRenderer, vulkan_t* vulkan, con
 		.pBindings = bindings,
 	};
 	if (vkCreateDescriptorSetLayout(vulkan->device, &descriptorSetLayoutInfo, NULL, &debugRenderer->descriptorSetLayout) != VK_SUCCESS) {
-		return 1;
+		return NULL;
 	}
 	SetDescriptorSetLayoutName(vulkan, debugRenderer->descriptorSetLayout, "DebugRenderer");
 
@@ -42,13 +92,9 @@ int debug_renderer_create(debug_renderer_t* debugRenderer, vulkan_t* vulkan, con
 		.pSetLayouts = &debugRenderer->descriptorSetLayout,
 	};
 	if (vkCreatePipelineLayout(vulkan->device, &pipelineLayoutInfo, NULL, &debugRenderer->pipelineLayout) != VK_SUCCESS) {
-		return 1;
+		return NULL;
 	}
 	SetPipelineLayoutName(vulkan, debugRenderer->pipelineLayout, "DebugRenderer");
-
-	debugRenderer->maxPoints			= config->maxPoints;
-	debugRenderer->maxLines				= config->maxLines;
-	debugRenderer->maxTriangles			= config->maxTriangles;
 
 	r = CreateDebugPipeline(&debugRenderer->pointPipeline, vulkan, debugRenderer->pipelineLayout, VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
 	assert(r == 0);
@@ -56,12 +102,13 @@ int debug_renderer_create(debug_renderer_t* debugRenderer, vulkan_t* vulkan, con
 	assert(r == 0);
 	r = CreateDebugPipeline(&debugRenderer->trianglePipeline, vulkan, debugRenderer->pipelineLayout, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	assert(r == 0);
+	
+	for (int i = 0; i < DEBUG_RENDERER_BUFFER_COUNT; ++i)
+	{
+		debug_renderer_buffer_alloc(&debugRenderer->buffers[i], config);
+	}
 
-	debugRenderer->pointVertices = calloc(config->maxPoints, sizeof(debug_vertex_t));
-	debugRenderer->lineVertices = calloc(config->maxLines * 2, sizeof(debug_vertex_t));
-	debugRenderer->triangleVertices = calloc(config->maxTriangles * 3, sizeof(debug_vertex_t));
-
-	return 0;
+	return debugRenderer;
 }
 
 void debug_renderer_destroy(debug_renderer_t* debugRenderer, vulkan_t* vulkan)
@@ -88,15 +135,31 @@ int AllocateDebugRendererStagingMemory(staging_memory_allocator_t* allocator, de
 	return 0;
 }
 
-void FlushDebugRenderer(
+void debug_renderer_flush(
 	VkCommandBuffer cb, 
 	staging_memory_context_t* stagingMemory,
 	debug_renderer_t* debugRenderer,
 	descriptor_allocator_t* dsalloc,
 	VkDescriptorBufferInfo frameUniformBuffer,
 	uint32_t frameIndex)
-{
-	const size_t totalVertexCount = debugRenderer->pointCount + debugRenderer->lineCount * 2 + debugRenderer->triangleCount * 3;
+{	
+	size_t totalVertexCount = 0u;
+
+	size_t pointCount = 0u;
+	size_t lineCount = 0u;
+	size_t triangleCount = 0u;
+
+	for (int bufferIndex = 0; bufferIndex < DEBUG_RENDERER_BUFFER_COUNT; ++bufferIndex)
+	{
+		debug_renderer_buffer_t* buffer = &debugRenderer->buffers[bufferIndex];
+		
+		totalVertexCount += buffer->pointCount + buffer->lineCount * 2 + buffer->triangleCount * 3;
+		
+		pointCount += buffer->pointCount;
+		lineCount += buffer->lineCount;
+		triangleCount += buffer->triangleCount;
+	}
+
 	if (totalVertexCount == 0) {
 		return;
 	}
@@ -104,12 +167,25 @@ void FlushDebugRenderer(
 	debug_renderer_frame_t* frame = &debugRenderer->frames[frameIndex];
 	
 	const size_t pointVertexOffset = 0u;
-	const size_t lineVertexOffset = debugRenderer->pointCount;
-	const size_t triangleVertexOffset = debugRenderer->pointCount + debugRenderer->lineCount * 2;
+	const size_t lineVertexOffset = pointCount;
+	const size_t triangleVertexOffset = pointCount + lineCount * 2;
 
-	memcpy(frame->vertices + pointVertexOffset, debugRenderer->pointVertices, debugRenderer->pointCount * sizeof(debug_vertex_t));
-	memcpy(frame->vertices + lineVertexOffset, debugRenderer->lineVertices, debugRenderer->lineCount * 2 * sizeof(debug_vertex_t));
-	memcpy(frame->vertices + triangleVertexOffset, debugRenderer->triangleVertices, debugRenderer->triangleCount * 3 * sizeof(debug_vertex_t));
+	debug_vertex_t* pointVertices = frame->vertices + pointVertexOffset;
+	debug_vertex_t* lineVertices = frame->vertices + lineVertexOffset;
+	debug_vertex_t* triangleVertices = frame->vertices + triangleVertexOffset;
+	
+	for (int bufferIndex = 0; bufferIndex < DEBUG_RENDERER_BUFFER_COUNT; ++bufferIndex)
+	{
+		debug_renderer_buffer_t* buffer = &debugRenderer->buffers[bufferIndex];
+		
+		memcpy(pointVertices, buffer->pointVertices, buffer->pointCount * sizeof(debug_vertex_t));
+		memcpy(lineVertices, buffer->lineVertices, buffer->lineCount * 2 * sizeof(debug_vertex_t));
+		memcpy(triangleVertices, buffer->triangleVertices, buffer->pointCount * 3 * sizeof(debug_vertex_t));
+		
+		pointVertices += buffer->pointCount;
+		lineVertices += buffer->lineCount * 2;
+		triangleVertices += buffer->triangleCount * 3;
+	}
 
 	const VkDeviceSize pointBufferOffset = pointVertexOffset * sizeof(debug_vertex_t);
 	const VkDeviceSize lineBufferOffset = lineVertexOffset * sizeof(debug_vertex_t);
@@ -121,71 +197,75 @@ void FlushDebugRenderer(
 
 	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, debugRenderer->pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
-	if (debugRenderer->pointCount > 0) {
+	if (pointCount > 0) {
 		vkCmdBindVertexBuffers(cb, 0, 1, &frame->vertexBuffer, &pointBufferOffset);
 		vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, debugRenderer->pointPipeline);
-		vkCmdDraw(cb, debugRenderer->pointCount, 1, 0, 0);
+		vkCmdDraw(cb, pointCount, 1, 0, 0);
 	}
-	if (debugRenderer->lineCount > 0) {
+	if (lineCount > 0) {
 		vkCmdBindVertexBuffers(cb, 0, 1, &frame->vertexBuffer, &lineBufferOffset);
 		vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, debugRenderer->linePipeline);
-		vkCmdDraw(cb, debugRenderer->lineCount * 2, 1, 0, 0);
+		vkCmdDraw(cb, lineCount * 2, 1, 0, 0);
 	}
-	if (debugRenderer->triangleCount > 0) {
+	if (triangleCount > 0) {
 		vkCmdBindVertexBuffers(cb, 0, 1, &frame->vertexBuffer, &triangleBufferOffset);
 		vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, debugRenderer->trianglePipeline);
-		vkCmdDraw(cb, debugRenderer->triangleCount * 3, 1, 0, 0);
+		vkCmdDraw(cb, triangleCount * 3, 1, 0, 0);
 	}
-
-	debugRenderer->pointCount = 0;
-	debugRenderer->lineCount = 0;
-	debugRenderer->triangleCount = 0;
 
 	PushStagingMemoryFlush(stagingMemory, frame->vertices, totalVertexCount * sizeof(debug_vertex_t));
 }
 
-static debug_renderer_t* g_debugRenderer;
+static debug_renderer_buffer_t* g_currentBuffer;
 
-void MakeCurrentDebugRenderer(debug_renderer_t* debugRenderer)
+void debug_renderer_clear_buffer(debug_renderer_t* debugRenderer, debug_renderer_buffer_id_t id)
 {
-	g_debugRenderer = debugRenderer;
+	debug_renderer_buffer_t* buffer = &debugRenderer->buffers[id];
+	buffer->pointCount = 0;
+	buffer->lineCount = 0;
+	buffer->triangleCount = 0;
+}
+
+void debug_renderer_set_current_buffer(debug_renderer_t* debugRenderer, debug_renderer_buffer_id_t id)
+{
+	g_currentBuffer = &debugRenderer->buffers[id];
 }
 
 void DrawDebugPoint(debug_vertex_t vertex)
 {
-	debug_renderer_t* debugRenderer = g_debugRenderer;
-	if (debugRenderer->pointCount >= debugRenderer->maxPoints) {
+	debug_renderer_buffer_t* buffer = g_currentBuffer;
+	if (buffer->pointCount >= buffer->maxPoints) {
 		return;
 	}
 	
-	debugRenderer->pointVertices[debugRenderer->pointCount++] = vertex;
+	buffer->pointVertices[buffer->pointCount++] = vertex;
 }
 
 void DrawDebugLine(debug_vertex_t v0, debug_vertex_t v1)
 {
-	debug_renderer_t* debugRenderer = g_debugRenderer;
-	if (debugRenderer->lineCount >= debugRenderer->maxLines) {
+	debug_renderer_buffer_t* buffer = g_currentBuffer;
+	if (buffer->lineCount >= buffer->maxLines) {
 		return;
 	}
 
-	const size_t offset = debugRenderer->lineCount * 2;
-	debugRenderer->lineVertices[offset + 0u] = v0;
-	debugRenderer->lineVertices[offset + 1u] = v1;
-	++debugRenderer->lineCount;
+	const size_t offset = buffer->lineCount * 2;
+	buffer->lineVertices[offset + 0u] = v0;
+	buffer->lineVertices[offset + 1u] = v1;
+	++buffer->lineCount;
 }
 
 void DrawDebugTriangle(debug_vertex_t v0, debug_vertex_t v1, debug_vertex_t v2)
 {
-	debug_renderer_t* debugRenderer = g_debugRenderer;
-	if (debugRenderer->triangleCount >= debugRenderer->maxTriangles) {
+	debug_renderer_buffer_t* buffer = g_currentBuffer;
+	if (buffer->triangleCount >= buffer->maxTriangles) {
 		return;
 	}
 
-	const size_t offset = debugRenderer->triangleCount * 3;
-	debugRenderer->triangleVertices[offset + 0u] = v0;
-	debugRenderer->triangleVertices[offset + 1u] = v1;
-	debugRenderer->triangleVertices[offset + 2u] = v2;
-	++debugRenderer->triangleCount;
+	const size_t offset = buffer->triangleCount * 3;
+	buffer->triangleVertices[offset + 0u] = v0;
+	buffer->triangleVertices[offset + 1u] = v1;
+	buffer->triangleVertices[offset + 2u] = v2;
+	++buffer->triangleCount;
 }
 
 void DrawDebugBox(vec3 a, vec3 b, uint32_t color)

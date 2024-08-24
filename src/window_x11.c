@@ -117,6 +117,7 @@ enum key_code MapKeyCode(XKeyEvent* event)
 		case XK_Shift_L:	return KEY_SHIFT;
 		case XK_Delete:		return KEY_DELETE;
 		case XK_F1:			return KEY_F1;
+		case XK_Pause:		return KEY_PAUSE;
 	}
 
 	return KEY_UNKNOWN;

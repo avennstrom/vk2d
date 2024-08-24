@@ -285,9 +285,8 @@ int main(int argc, char **argv)
 		.maxLines = 512 * 1024,
 		.maxTriangles = 128 * 1024,
 	};
-	debug_renderer_t debugRenderer = {};
-	r = debug_renderer_create(&debugRenderer, &vulkan, &debugRendererConfig);
-	assert(r == 0);
+	debug_renderer_t* debugRenderer = debug_renderer_create(&vulkan, &debugRendererConfig);
+	assert(debugRenderer != NULL);
 
 	for (uint32_t i = 0; i < FRAME_COUNT; ++i)
 	{
@@ -352,7 +351,7 @@ int main(int argc, char **argv)
 	staging_memory_allocator_t staging_allocator;
 	ResetStagingMemoryAllocator(&staging_allocator, &vulkan);
 	scene_alloc_staging_mem(&staging_allocator, scene);
-	AllocateDebugRendererStagingMemory(&staging_allocator, &debugRenderer);
+	AllocateDebugRendererStagingMemory(&staging_allocator, debugRenderer);
 	model_loader_alloc_staging_mem(&staging_allocator, modelLoader);
 	//terrain_alloc_staging_mem(&staging_allocator, terrain);
 	world_alloc_staging_mem(&staging_allocator, world);
@@ -381,6 +380,7 @@ int main(int argc, char **argv)
 	app_mode_t appMode = APP_MODE_GAME;
 
 	bool holdingCtrl = false;
+	bool pause = false;
 
 	for (;;)
 	{
@@ -425,6 +425,10 @@ int main(int argc, char **argv)
 					assert(f != NULL);
 					world_serialize(world, f);
 					fclose(f);
+				}
+				else if (event.data.key.code == KEY_PAUSE)
+				{
+					pause = !pause;
 				}
 			}
 			
@@ -491,13 +495,19 @@ int main(int argc, char **argv)
 		double elapsedTime;
 		delta_timer_capture(&deltaTime, &elapsedTime, &deltaTimer);
 
-		MakeCurrentDebugRenderer(&debugRenderer);
+		if (!pause)
+		{
+			tickAccumulator += deltaTime;
+		}
 
-		tickAccumulator += deltaTime;
+		debug_renderer_clear_buffer(debugRenderer, DEBUG_RENDERER_BUFFER_FRAME);
+		debug_renderer_set_current_buffer(debugRenderer, DEBUG_RENDERER_BUFFER_TICK);
 
 		while (tickAccumulator >= DELTA_TIME_MS)
 		{
 			tickAccumulator -= DELTA_TIME_MS;
+
+			debug_renderer_clear_buffer(debugRenderer, DEBUG_RENDERER_BUFFER_TICK);
 
 			world_tick(world);
 
@@ -510,12 +520,7 @@ int main(int argc, char **argv)
 			particles_tick(particles);
 		}
 
-#if 1
-		{
-			struct timeval tv = {.tv_usec = 20 * 1000};
-			select(0, NULL, NULL, NULL, &tv);
-		}
-#endif
+		debug_renderer_set_current_buffer(debugRenderer, DEBUG_RENDERER_BUFFER_FRAME);
 
 		//
 		// ---- render ----
@@ -587,7 +592,7 @@ int main(int argc, char **argv)
 			.world = world,
 			.wind = wind,
 			.particles = particles,
-			.debugRenderer = &debugRenderer,
+			.debugRenderer = debugRenderer,
 			.rt = &rt,
 		};
 
@@ -678,8 +683,6 @@ int main(int argc, char **argv)
 		vkr = vkEndCommandBuffer(cb);
 		assert(vkr == VK_SUCCESS);
 
-		MakeCurrentDebugRenderer(NULL);
-
 		vkr = FlushStagingMemory(&stagingMemoryContext, &vulkan);
 		assert(vkr == VK_SUCCESS);
 
@@ -768,7 +771,7 @@ int main(int argc, char **argv)
 	world_destroy(world);
 	//terrain_destroy(terrain);
 	model_loader_destroy(modelLoader);
-	debug_renderer_destroy(&debugRenderer, &vulkan);
+	debug_renderer_destroy(debugRenderer, &vulkan);
 	scene_destroy(scene);
 	composite_destroy(composite, &vulkan);
 
