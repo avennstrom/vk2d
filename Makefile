@@ -10,10 +10,10 @@ SHADER_OBJ := ${SHADER_OBJ} obj/debug.vs.spo obj/debug.fs.spo
 SHADER_OBJ := ${SHADER_OBJ} obj/composite.vs.spo obj/composite.fs.spo
 SHADER_OBJ := ${SHADER_OBJ} obj/particle.vs.spo obj/particle.fs.spo
 
-.PHONY: shaderc run-converter
+.PHONY: shaderc
 .SECONDARY: $(SHADER_SPV)
 
-default: shaderc ${TARGET_NAME} converter run-converter
+default: shaderc ${TARGET_NAME}
 
 ${TARGET_NAME}: ${C_OBJ} ${SHADER_OBJ} | $(SHADER_DIS) ${H_FILES}
 	$(CC) -Werror -std=c11 -L${VULKAN_SDK}/lib -g -o $@ $^ -lvulkan -lX11 -lm
