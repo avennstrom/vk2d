@@ -38,6 +38,7 @@ typedef struct editor_polygon
 {
 	uint	vertexCount;
 	vec2	vertexPosition[POLYGON_MAX_VERTICES];
+	uint	layer;
 } editor_polygon_t;
 
 typedef struct triangle_collider
@@ -62,7 +63,10 @@ void world_get_collision_info(world_collision_info_t* info, world_t* world);
 typedef struct world_edit_info
 {
 	uint				polygonCount;
-	editor_polygon_t*	polygons;
+	editor_polygon_t**	polygons;
 } world_edit_info_t;
 
 void world_get_edit_info(world_edit_info_t* info, world_t* world);
+
+float world_get_parallax_layer_depth(uint layerIndex);
+void editor_polygon_debug_draw(editor_polygon_t* p);

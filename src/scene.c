@@ -935,14 +935,29 @@ void scene_draw(
 				vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->particlePipeline);
 				vkCmdDraw(cb, 6 * particleInfo.particleCount, 1, 0, 0);
 			}
-			
+
 			debug_renderer_flush(
 				cb, 
 				rc->stagingMemory, 
 				src->debugRenderer,
 				rc->dsalloc,
-				frameUniformBuffer,
-				rc->frameIndex);
+				rc->frameIndex,
+				DEBUG_RENDERER_VIEW_3D,
+				scb->camera.viewProjectionMatrix);
+
+			mat4 screenMatrix = mat_identity();
+			screenMatrix.r0.x = 2.0f;
+			screenMatrix.r1.y = -2.0f;
+			screenMatrix = mat_translate(screenMatrix, (vec3){-0.5f, -0.5f});
+
+			debug_renderer_flush(
+				cb, 
+				rc->stagingMemory, 
+				src->debugRenderer,
+				rc->dsalloc,
+				rc->frameIndex,
+				DEBUG_RENDERER_VIEW_2D,
+				mat_transpose(screenMatrix));
 		}
 		vkCmdEndRendering(cb);
 	}

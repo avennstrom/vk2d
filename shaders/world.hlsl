@@ -100,8 +100,12 @@ FsOutput fs_main(VsOutput input)
 {
 	FsOutput output = (FsOutput)0;
 
+	const float depth = input.position.z / input.position.w;
+
 	float3 albedo = input.color;
 	//albedo = input.normal;
+
+	albedo = lerp(albedo, float3(1.0f, 1.0f, 1.0f), pow(max(0,depth - 6.0f), 2.0f) * 0.0008f);
 
 	float3 color = 0.0f.rrr;
 	

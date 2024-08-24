@@ -1,6 +1,6 @@
 #include "gpu_types.h"
 
-[[vk::binding(0)]]	ConstantBuffer<gpu_frame_uniforms_t>	g_frame;
+[[vk::binding(0)]]	ConstantBuffer<gpu_debug_renderer_uniforms_t>	g_uniforms;
 
 struct VsInput
 {
@@ -20,7 +20,7 @@ VsOutput vs_main(VsInput input)
 	VsOutput output = (VsOutput)0;
 	output.pointSize	= 16.0f;
 	output.color		= input.color;
-	output.position		= mul(float4(input.position, 1.0), g_frame.matViewProj);
+	output.position		= mul(float4(input.position, 1.0), g_uniforms.matViewProj);
 	output.position.y	= -output.position.y;
 	return output;
 }

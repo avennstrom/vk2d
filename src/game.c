@@ -166,12 +166,13 @@ static void TickPlayerMovement(game_t* game, float deltaTime)
 static void calculate_camera(scb_camera_t* renderCamera, const camera_t* camera, float aspectRatio)
 {
 	mat4 m = mat_identity();
-	m = mat_translate(m, (vec3){ camera->pos.x, camera->pos.y, 0.0f });
+	m = mat_translate(m, (vec3){ camera->pos.x, camera->pos.y, CAMERA_OFFSET });
 
 	const vec2 viewSize = {camera->height * aspectRatio, camera->height};
 
 	const mat4 viewMatrix = mat_invert(m);
-	const mat4 projectionMatrix = mat_orthographic(viewSize, 0.0f, 1.0f);
+	//const mat4 projectionMatrix = mat_orthographic(viewSize, 0.0f, 1.0f);
+	const mat4 projectionMatrix = mat_perspective(CAMERA_FOV, aspectRatio, CAMERA_NEAR, CAMERA_FAR);
 	const mat4 viewProjectionMatrix = mat_mul(viewMatrix, projectionMatrix);
 
 	// :TODO: transpose these in the scene instead

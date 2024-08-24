@@ -10,6 +10,7 @@
 typedef struct gpu_draw_t gpu_draw_t;
 typedef struct gpu_point_light_t gpu_point_light_t;
 typedef struct gpu_frame_uniforms_t gpu_frame_uniforms_t;
+typedef struct gpu_debug_renderer_uniforms_t gpu_debug_renderer_uniforms_t;
 typedef struct gpu_particle_t gpu_particle_t;
 #endif
 
@@ -53,6 +54,11 @@ struct gpu_frame_uniforms_t
 	float	elapsedTime;
 };
 
+struct gpu_debug_renderer_uniforms_t
+{
+	mat4	matViewProj;
+};
+
 struct gpu_particle_t
 {
 	vec2	center;
@@ -64,5 +70,6 @@ struct gpu_particle_t
 _Static_assert(sizeof(gpu_draw_t) == 96, "");
 _Static_assert(sizeof(gpu_point_light_t) == 32, "");
 _Static_assert(sizeof(gpu_frame_uniforms_t) == 80, "");
+_Static_assert(sizeof(gpu_debug_renderer_uniforms_t) == 64, "");
 _Static_assert(sizeof(gpu_particle_t) == 16, "");
 #endif

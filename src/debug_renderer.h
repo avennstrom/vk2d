@@ -31,6 +31,13 @@ typedef enum debug_renderer_buffer_id
 	DEBUG_RENDERER_BUFFER_COUNT,
 } debug_renderer_buffer_id_t;
 
+typedef enum debug_renderer_view_id
+{
+	DEBUG_RENDERER_VIEW_2D,
+	DEBUG_RENDERER_VIEW_3D,
+	DEBUG_RENDERER_VIEW_COUNT,
+} debug_renderer_view_id_t;
+
 debug_renderer_t* debug_renderer_create(vulkan_t* vulkan, const debug_renderer_config_t* config);
 void debug_renderer_destroy(debug_renderer_t* debugRenderer, vulkan_t* vulkan);
 
@@ -44,9 +51,14 @@ void debug_renderer_flush(
 	staging_memory_context_t* stagingMemory,
 	debug_renderer_t* debugRenderer,
 	descriptor_allocator_t* dsalloc,
-	VkDescriptorBufferInfo frameUniformBuffer,
-	uint32_t frameIndex);
+	uint32_t frameIndex,
+	debug_renderer_view_id_t viewId,
+	mat4 viewProjectionMatrix);
 
+// 2d
+void DrawDebugPoint2D(debug_vertex_t vertex);
+
+// 3d
 void DrawDebugPoint(debug_vertex_t vertex);
 void DrawDebugLine(debug_vertex_t v0, debug_vertex_t v1);
 void DrawDebugTriangle(debug_vertex_t v0, debug_vertex_t v1, debug_vertex_t v2);

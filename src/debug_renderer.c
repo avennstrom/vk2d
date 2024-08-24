@@ -18,8 +18,10 @@
 #define MAX_FRAME_VERTICES	(1024 * 1024)
 
 typedef struct debug_renderer_frame {
-	VkBuffer		vertexBuffer;
-	debug_vertex_t*	vertices;
+	VkBuffer						vertexBuffer[DEBUG_RENDERER_VIEW_COUNT];
+	debug_vertex_t*					vertices[DEBUG_RENDERER_VIEW_COUNT];
+	VkBuffer						uniformBuffer[DEBUG_RENDERER_VIEW_COUNT];
+	gpu_debug_renderer_uniforms_t*	uniforms[DEBUG_RENDERER_VIEW_COUNT];
 } debug_renderer_frame_t;
 
 typedef struct debug_renderer_buffer
@@ -36,6 +38,11 @@ typedef struct debug_renderer_buffer
 	size_t					triangleCount;
 } debug_renderer_buffer_t;
 
+typedef struct debug_renderer_view
+{
+	debug_renderer_buffer_t	buffers[DEBUG_RENDERER_BUFFER_COUNT];
+} debug_renderer_view_t;
+
 typedef struct debug_renderer
 {
 	debug_renderer_frame_t	frames[FRAME_COUNT];
@@ -47,8 +54,11 @@ typedef struct debug_renderer
 	VkPipeline				trianglePipeline;
 
 	// draw state
-	debug_renderer_buffer_t	buffers[DEBUG_RENDERER_BUFFER_COUNT];
+	debug_renderer_view_t	views[DEBUG_RENDERER_VIEW_COUNT];
 } debug_renderer_t;
+
+static debug_renderer_buffer_id_t	g_currentBuffer;
+static debug_renderer_t*			g_debugRenderer;
 
 static int CreateDebugPipeline(VkPipeline* pipeline, vulkan_t* vulkan, VkPipelineLayout pipelineLayout, VkPrimitiveTopology topology);
 
@@ -103,20 +113,25 @@ debug_renderer_t* debug_renderer_create(vulkan_t* vulkan, const debug_renderer_c
 	r = CreateDebugPipeline(&debugRenderer->trianglePipeline, vulkan, debugRenderer->pipelineLayout, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	assert(r == 0);
 	
-	for (int i = 0; i < DEBUG_RENDERER_BUFFER_COUNT; ++i)
+	for (int i = 0; i < DEBUG_RENDERER_VIEW_COUNT; ++i)
 	{
-		debug_renderer_buffer_alloc(&debugRenderer->buffers[i], config);
+		for (int j = 0; j < DEBUG_RENDERER_BUFFER_COUNT; ++j)
+		{
+			debug_renderer_buffer_alloc(&debugRenderer->views[i].buffers[j], config);
+		}
 	}
+
+	g_debugRenderer = debugRenderer;
 
 	return debugRenderer;
 }
 
 void debug_renderer_destroy(debug_renderer_t* debugRenderer, vulkan_t* vulkan)
 {
-	for (size_t i = 0; i < FRAME_COUNT; ++i) {
-		debug_renderer_frame_t* frame = &debugRenderer->frames[i];
-		vkDestroyBuffer(vulkan->device, frame->vertexBuffer, NULL);
-	}
+	// for (size_t i = 0; i < FRAME_COUNT; ++i) {
+	// 	debug_renderer_frame_t* frame = &debugRenderer->frames[i];
+	// 	vkDestroyBuffer(vulkan->device, frame->vertexBuffer, NULL);
+	// }
 
 	vkDestroyPipeline(vulkan->device, debugRenderer->pointPipeline, NULL);
 	vkDestroyPipeline(vulkan->device, debugRenderer->linePipeline, NULL);
@@ -129,7 +144,25 @@ int AllocateDebugRendererStagingMemory(staging_memory_allocator_t* allocator, de
 {
 	for (size_t i = 0; i < FRAME_COUNT; ++i) {
 		debug_renderer_frame_t* frame = &debugRenderer->frames[i];
-		PushStagingBufferAllocation(allocator, &frame->vertexBuffer, (void**)&frame->vertices, MAX_FRAME_VERTICES * sizeof(debug_vertex_t), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, "Debug Vertices");
+		
+		for (int viewIndex = 0; viewIndex < DEBUG_RENDERER_VIEW_COUNT; ++viewIndex)
+		{
+			PushStagingBufferAllocation(
+				allocator, 
+				&frame->vertexBuffer[viewIndex],
+				(void**)&frame->vertices[viewIndex],
+				MAX_FRAME_VERTICES * sizeof(debug_vertex_t), 
+				VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
+				"Debug Vertices");
+
+			PushStagingBufferAllocation(
+				allocator, 
+				&frame->uniformBuffer[viewIndex],
+				(void**)&frame->uniforms[viewIndex],
+				sizeof(gpu_debug_renderer_uniforms_t),
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				"Uniforms");
+		}
 	}
 
 	return 0;
@@ -140,8 +173,9 @@ void debug_renderer_flush(
 	staging_memory_context_t* stagingMemory,
 	debug_renderer_t* debugRenderer,
 	descriptor_allocator_t* dsalloc,
-	VkDescriptorBufferInfo frameUniformBuffer,
-	uint32_t frameIndex)
+	uint32_t frameIndex,
+	debug_renderer_view_id_t viewId,
+	mat4 viewProjectionMatrix)
 {	
 	size_t totalVertexCount = 0u;
 
@@ -149,9 +183,11 @@ void debug_renderer_flush(
 	size_t lineCount = 0u;
 	size_t triangleCount = 0u;
 
+	debug_renderer_view_t* view = &debugRenderer->views[viewId];
+
 	for (int bufferIndex = 0; bufferIndex < DEBUG_RENDERER_BUFFER_COUNT; ++bufferIndex)
 	{
-		debug_renderer_buffer_t* buffer = &debugRenderer->buffers[bufferIndex];
+		debug_renderer_buffer_t* buffer = &view->buffers[bufferIndex];
 		
 		totalVertexCount += buffer->pointCount + buffer->lineCount * 2 + buffer->triangleCount * 3;
 		
@@ -170,13 +206,13 @@ void debug_renderer_flush(
 	const size_t lineVertexOffset = pointCount;
 	const size_t triangleVertexOffset = pointCount + lineCount * 2;
 
-	debug_vertex_t* pointVertices = frame->vertices + pointVertexOffset;
-	debug_vertex_t* lineVertices = frame->vertices + lineVertexOffset;
-	debug_vertex_t* triangleVertices = frame->vertices + triangleVertexOffset;
+	debug_vertex_t* pointVertices = frame->vertices[viewId] + pointVertexOffset;
+	debug_vertex_t* lineVertices = frame->vertices[viewId] + lineVertexOffset;
+	debug_vertex_t* triangleVertices = frame->vertices[viewId] + triangleVertexOffset;
 	
 	for (int bufferIndex = 0; bufferIndex < DEBUG_RENDERER_BUFFER_COUNT; ++bufferIndex)
 	{
-		debug_renderer_buffer_t* buffer = &debugRenderer->buffers[bufferIndex];
+		debug_renderer_buffer_t* buffer = &view->buffers[bufferIndex];
 		
 		memcpy(pointVertices, buffer->pointVertices, buffer->pointCount * sizeof(debug_vertex_t));
 		memcpy(lineVertices, buffer->lineVertices, buffer->lineCount * 2 * sizeof(debug_vertex_t));
@@ -191,49 +227,64 @@ void debug_renderer_flush(
 	const VkDeviceSize lineBufferOffset = lineVertexOffset * sizeof(debug_vertex_t);
 	const VkDeviceSize triangleBufferOffset = triangleVertexOffset * sizeof(debug_vertex_t);
 
+	gpu_debug_renderer_uniforms_t* uniforms = frame->uniforms[viewId];
+	uniforms->matViewProj = viewProjectionMatrix;
+
 	descriptor_allocator_begin(dsalloc, debugRenderer->descriptorSetLayout, "Debug Renderer");
-	descriptor_allocator_set_uniform_buffer(dsalloc, 0, frameUniformBuffer);
+	descriptor_allocator_set_uniform_buffer(dsalloc, 0, (VkDescriptorBufferInfo){frame->uniformBuffer[viewId], 0, VK_WHOLE_SIZE});
 	VkDescriptorSet descriptorSet = descriptor_allocator_end(dsalloc);
 
 	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, debugRenderer->pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
 	if (pointCount > 0) {
-		vkCmdBindVertexBuffers(cb, 0, 1, &frame->vertexBuffer, &pointBufferOffset);
+		vkCmdBindVertexBuffers(cb, 0, 1, &frame->vertexBuffer[viewId], &pointBufferOffset);
 		vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, debugRenderer->pointPipeline);
 		vkCmdDraw(cb, pointCount, 1, 0, 0);
 	}
 	if (lineCount > 0) {
-		vkCmdBindVertexBuffers(cb, 0, 1, &frame->vertexBuffer, &lineBufferOffset);
+		vkCmdBindVertexBuffers(cb, 0, 1, &frame->vertexBuffer[viewId], &lineBufferOffset);
 		vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, debugRenderer->linePipeline);
 		vkCmdDraw(cb, lineCount * 2, 1, 0, 0);
 	}
 	if (triangleCount > 0) {
-		vkCmdBindVertexBuffers(cb, 0, 1, &frame->vertexBuffer, &triangleBufferOffset);
+		vkCmdBindVertexBuffers(cb, 0, 1, &frame->vertexBuffer[viewId], &triangleBufferOffset);
 		vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, debugRenderer->trianglePipeline);
 		vkCmdDraw(cb, triangleCount * 3, 1, 0, 0);
 	}
 
-	PushStagingMemoryFlush(stagingMemory, frame->vertices, totalVertexCount * sizeof(debug_vertex_t));
+	PushStagingMemoryFlush(stagingMemory, uniforms, sizeof(gpu_debug_renderer_uniforms_t));
+	PushStagingMemoryFlush(stagingMemory, frame->vertices[viewId], totalVertexCount * sizeof(debug_vertex_t));
 }
-
-static debug_renderer_buffer_t* g_currentBuffer;
 
 void debug_renderer_clear_buffer(debug_renderer_t* debugRenderer, debug_renderer_buffer_id_t id)
 {
-	debug_renderer_buffer_t* buffer = &debugRenderer->buffers[id];
-	buffer->pointCount = 0;
-	buffer->lineCount = 0;
-	buffer->triangleCount = 0;
+	for (int i = 0; i < DEBUG_RENDERER_VIEW_COUNT; ++i)
+	{
+		debug_renderer_buffer_t* buffer = &g_debugRenderer->views[i].buffers[g_currentBuffer];
+		buffer->pointCount = 0;
+		buffer->lineCount = 0;
+		buffer->triangleCount = 0;
+	}
 }
 
 void debug_renderer_set_current_buffer(debug_renderer_t* debugRenderer, debug_renderer_buffer_id_t id)
 {
-	g_currentBuffer = &debugRenderer->buffers[id];
+	g_currentBuffer = id;
+}
+
+void DrawDebugPoint2D(debug_vertex_t vertex)
+{
+	debug_renderer_buffer_t* buffer = &g_debugRenderer->views[DEBUG_RENDERER_VIEW_2D].buffers[g_currentBuffer];
+	if (buffer->pointCount >= buffer->maxPoints) {
+		return;
+	}
+	
+	buffer->pointVertices[buffer->pointCount++] = vertex;
 }
 
 void DrawDebugPoint(debug_vertex_t vertex)
 {
-	debug_renderer_buffer_t* buffer = g_currentBuffer;
+	debug_renderer_buffer_t* buffer = &g_debugRenderer->views[DEBUG_RENDERER_VIEW_3D].buffers[g_currentBuffer];
 	if (buffer->pointCount >= buffer->maxPoints) {
 		return;
 	}
@@ -243,7 +294,7 @@ void DrawDebugPoint(debug_vertex_t vertex)
 
 void DrawDebugLine(debug_vertex_t v0, debug_vertex_t v1)
 {
-	debug_renderer_buffer_t* buffer = g_currentBuffer;
+	debug_renderer_buffer_t* buffer = &g_debugRenderer->views[DEBUG_RENDERER_VIEW_3D].buffers[g_currentBuffer];
 	if (buffer->lineCount >= buffer->maxLines) {
 		return;
 	}
@@ -256,7 +307,7 @@ void DrawDebugLine(debug_vertex_t v0, debug_vertex_t v1)
 
 void DrawDebugTriangle(debug_vertex_t v0, debug_vertex_t v1, debug_vertex_t v2)
 {
-	debug_renderer_buffer_t* buffer = g_currentBuffer;
+	debug_renderer_buffer_t* buffer = &g_debugRenderer->views[DEBUG_RENDERER_VIEW_3D].buffers[g_currentBuffer];
 	if (buffer->triangleCount >= buffer->maxTriangles) {
 		return;
 	}
@@ -396,7 +447,7 @@ static int CreateDebugPipeline(
 
 	const VkPipelineDepthStencilStateCreateInfo depthStencilState = {
 		VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-		.depthTestEnable = VK_TRUE,
+		//.depthTestEnable = VK_TRUE,
 		.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
 	};
 

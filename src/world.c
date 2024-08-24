@@ -30,6 +30,11 @@ typedef struct world_colliders
 	triangle_collider_t	triangles[WORLD_MAX_TRIANGLE_COLLIDERS];
 } world_colliders_t;
 
+typedef struct parallax_layer
+{
+	editor_polygon_t	polygon;
+} parallax_layer_t;
+
 typedef struct world
 {
 	vulkan_t*			vulkan;
@@ -48,7 +53,7 @@ typedef struct world
 	VkBuffer			stagingBuffer;
 	void*				stagingBufferMemory;
 
-	editor_polygon_t	polygon;
+	parallax_layer_t	layers[PARALLAX_LAYER_COUNT];
 	world_colliders_t	colliders;
 
 	uint				rng;
@@ -61,7 +66,7 @@ typedef struct triangle
 } triangle_t;
 
 static void triangle_collider_debug_draw(triangle_collider_t* t);
-static void editor_polygon_debug_draw(editor_polygon_t* p);
+void editor_polygon_debug_draw(editor_polygon_t* p);
 static void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCount, const editor_polygon_t* polygon);
 
 world_t* world_create(vulkan_t* vulkan, particles_t* particles)
@@ -96,8 +101,9 @@ world_t* world_create(vulkan_t* vulkan, particles_t* particles)
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
+	for (int i = 0; i < PARALLAX_LAYER_COUNT; ++i)
 	{
-		editor_polygon_t* polygon = &world->polygon;
+		editor_polygon_t* polygon = &world->layers[i].polygon;
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-5.0f, 1.0f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){0.0f, 0.1f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){5.0f, 0.1f};
@@ -105,6 +111,7 @@ world_t* world_create(vulkan_t* vulkan, particles_t* particles)
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){5.0f, -1.0f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-5.0f, -1.0f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-10.0f, 0.0f};
+		polygon->layer = i;
 	}
 
 	return world;
@@ -148,7 +155,7 @@ typedef struct primitive_context
 	uint32_t	vertexCount;
 } primitive_context_t;
 
-static void grow_grass(primitive_context_t* ctx, vec2 root, vec2 tangent)
+static void grow_grass(primitive_context_t* ctx, vec3 root, vec2 tangent)
 {
 	ctx->indices[ctx->indexCount + 0] = ctx->vertexCount + 0;
 	ctx->indices[ctx->indexCount + 1] = ctx->vertexCount + 1;
@@ -158,9 +165,9 @@ static void grow_grass(primitive_context_t* ctx, vec2 root, vec2 tangent)
 	float width = 0.025f;
 	float height = 0.1f + (rand() / (float)RAND_MAX) * 0.5f;
 
-	ctx->positions[ctx->vertexCount + 0] = (vec3){root.x, root.y + height};
-	ctx->positions[ctx->vertexCount + 1] = (vec3){root.x - width * tangent.x, root.y - width * tangent.y};
-	ctx->positions[ctx->vertexCount + 2] = (vec3){root.x + width * tangent.x, root.y + width * tangent.y};
+	ctx->positions[ctx->vertexCount + 0] = (vec3){root.x, root.y + height, root.z};
+	ctx->positions[ctx->vertexCount + 1] = (vec3){root.x - width * tangent.x, root.y - width * tangent.y, root.z};
+	ctx->positions[ctx->vertexCount + 2] = (vec3){root.x + width * tangent.x, root.y + width * tangent.y, root.z};
 
 	uint8_t red = rand() & 0b1111111;
 
@@ -171,7 +178,7 @@ static void grow_grass(primitive_context_t* ctx, vec2 root, vec2 tangent)
 	ctx->vertexCount += 3;
 }
 
-static void grow_flower(primitive_context_t* ctx, vec2 root, vec2 tangent)
+static void grow_flower(primitive_context_t* ctx, vec3 root, vec2 tangent)
 {
 	float width = 0.01f;
 	float height = 0.3f + (rand() / (float)RAND_MAX) * 0.5f;
@@ -187,10 +194,10 @@ static void grow_flower(primitive_context_t* ctx, vec2 root, vec2 tangent)
 		ctx->indices[ctx->indexCount + 5] = ctx->vertexCount + 3;
 		ctx->indexCount += 6;
 
-		ctx->positions[ctx->vertexCount + 0] = (vec3){root.x - width, root.y + height};
-		ctx->positions[ctx->vertexCount + 1] = (vec3){root.x + width, root.y + height};
-		ctx->positions[ctx->vertexCount + 2] = (vec3){root.x - width * tangent.x, root.y - width * tangent.y};
-		ctx->positions[ctx->vertexCount + 3] = (vec3){root.x + width * tangent.x, root.y + width * tangent.y};
+		ctx->positions[ctx->vertexCount + 0] = (vec3){root.x - width, root.y + height, root.z};
+		ctx->positions[ctx->vertexCount + 1] = (vec3){root.x + width, root.y + height, root.z};
+		ctx->positions[ctx->vertexCount + 2] = (vec3){root.x - width * tangent.x, root.y - width * tangent.y, root.z};
+		ctx->positions[ctx->vertexCount + 3] = (vec3){root.x + width * tangent.x, root.y + width * tangent.y, root.z};
 
 		uint8_t red = rand() & 0b11111;
 
@@ -213,10 +220,10 @@ static void grow_flower(primitive_context_t* ctx, vec2 root, vec2 tangent)
 		ctx->indices[ctx->indexCount + 5] = ctx->vertexCount + 3;
 		ctx->indexCount += 6;
 
-		ctx->positions[ctx->vertexCount + 0] = (vec3){root.x - headSize * 0.5f, root.y + height + headSize * 0.5f};
-		ctx->positions[ctx->vertexCount + 1] = (vec3){root.x + headSize * 0.5f, root.y + height + headSize * 0.5f};
-		ctx->positions[ctx->vertexCount + 2] = (vec3){root.x - headSize * 0.2f, root.y + height - headSize * 0.5f};
-		ctx->positions[ctx->vertexCount + 3] = (vec3){root.x + headSize * 0.2f, root.y + height - headSize * 0.5f};
+		ctx->positions[ctx->vertexCount + 0] = (vec3){root.x - headSize * 0.5f, root.y + height + headSize * 0.5f, root.z};
+		ctx->positions[ctx->vertexCount + 1] = (vec3){root.x + headSize * 0.5f, root.y + height + headSize * 0.5f, root.z};
+		ctx->positions[ctx->vertexCount + 2] = (vec3){root.x - headSize * 0.2f, root.y + height - headSize * 0.5f, root.z};
+		ctx->positions[ctx->vertexCount + 3] = (vec3){root.x + headSize * 0.2f, root.y + height - headSize * 0.5f, root.z};
 
 		uint8_t r = rand() & 0xffu;
 		uint8_t g = rand() & 0xffu;
@@ -233,7 +240,7 @@ static void grow_flower(primitive_context_t* ctx, vec2 root, vec2 tangent)
 	}
 }
 
-static void grow_plant(primitive_context_t* ctx, vec2 root, vec2 tangent)
+static void grow_plant(primitive_context_t* ctx, vec3 root, vec2 tangent)
 {
 	const int type = rand() % 2;
 	if (type == 0)
@@ -246,11 +253,13 @@ static void grow_plant(primitive_context_t* ctx, vec2 root, vec2 tangent)
 	}
 }
 
-static void fill_primitive_data(primitive_context_t* ctx, const editor_polygon_t* polygon)
+static void fill_primitive_data(primitive_context_t* ctx, const editor_polygon_t* polygon, int layerIndex)
 {
 	triangle_t triangles[256];
 	size_t triangleCount;
 	editor_polygon_triangulate(triangles, &triangleCount, polygon);
+
+	const float depth = world_get_parallax_layer_depth(layerIndex);
 
 	for (size_t i = 0; i < triangleCount; ++i)
 	{
@@ -265,7 +274,7 @@ static void fill_primitive_data(primitive_context_t* ctx, const editor_polygon_t
 	for (size_t i = 0; i < polygon->vertexCount; ++i)
 	{
 		const vec2 p = polygon->vertexPosition[i];
-		ctx->positions[ctx->vertexCount + i] = (vec3){ p.x, p.y };
+		ctx->positions[ctx->vertexCount + i] = (vec3){ p.x, p.y, depth };
 		ctx->colors[ctx->vertexCount + i] = 0x001020;
 	}
 
@@ -295,7 +304,7 @@ static void fill_primitive_data(primitive_context_t* ctx, const editor_polygon_t
 		{
 			const float t = (rand() / (float)RAND_MAX);
 			const vec2 p = vec2_lerp(p0, p1, t);
-			grow_plant(ctx, p, d);
+			grow_plant(ctx, (vec3){p.x, p.y, depth}, d);
 		}
 	}
 }
@@ -307,7 +316,7 @@ void world_tick(world_t* world)
 	{
 		world->pollenTimer -= 20.0f;
 
-		const editor_polygon_t* polygon = &world->polygon;
+		const editor_polygon_t* polygon = &world->layers[0].polygon;
 
 		const uint vertexIndex = lcg_rand(&world->rng) % polygon->vertexCount;
 
@@ -331,11 +340,12 @@ void world_tick(world_t* world)
 void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc)
 {
 	{
+		editor_polygon_t* polygon = &world->layers[0].polygon;
 		world_colliders_t* colliders = &world->colliders;
 
 		triangle_t triangles[256];
 		size_t triangleCount;
-		editor_polygon_triangulate(triangles, &triangleCount, &world->polygon);
+		editor_polygon_triangulate(triangles, &triangleCount, polygon);
 		
 		for (size_t i = 0; i < triangleCount; ++i)
 		{
@@ -343,9 +353,9 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 			const uint i1 = triangles[i].i[1];
 			const uint i2 = triangles[i].i[2];
 			
-			const vec2 p0 = world->polygon.vertexPosition[i0];
-			const vec2 p1 = world->polygon.vertexPosition[i1];
-			const vec2 p2 = world->polygon.vertexPosition[i2];
+			const vec2 p0 = polygon->vertexPosition[i0];
+			const vec2 p1 = polygon->vertexPosition[i1];
+			const vec2 p2 = polygon->vertexPosition[i2];
 
 			colliders->triangles[i] = (triangle_collider_t){ p0, p1, p2 };
 		}
@@ -375,7 +385,10 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 				.colors = stagingColors,
 			};
 
-			fill_primitive_data(&ctx, &world->polygon);
+			for (int i = 0; i < PARALLAX_LAYER_COUNT; ++i)
+			{
+				fill_primitive_data(&ctx, &world->layers[i].polygon, i);
+			}
 
 			//printf("World triangles: %u, vertices: %u\n", ctx.indexCount / 3u, ctx.vertexCount);
 
@@ -430,12 +443,13 @@ int world_serialize(world_t* world, FILE* f)
 {
 	int r;
 
-	uint polygonCount = 1;
+	uint polygonCount = PARALLAX_LAYER_COUNT;
 	r = fwrite(&polygonCount, sizeof(uint), 1, f);
 	assert(r == 1);
 	
+	for (int i = 0; i < PARALLAX_LAYER_COUNT; ++i)
 	{
-		const editor_polygon_t* polygon = &world->polygon;
+		const editor_polygon_t* polygon = &world->layers[i].polygon;
 		r = fwrite(&polygon->vertexCount, sizeof(uint), 1, f);
 		assert(r == 1);
 		r = fwrite(polygon->vertexPosition, sizeof(vec2), polygon->vertexCount, f);
@@ -452,14 +466,17 @@ int world_deserialize(world_t* world, FILE* f)
 	uint polygonCount;
 	r = fread(&polygonCount, sizeof(uint), 1, f);
 	assert(r == 1);
-	assert(polygonCount == 1);
+	assert(polygonCount == PARALLAX_LAYER_COUNT);
 	
+	for (int i = 0; i < PARALLAX_LAYER_COUNT; ++i)
 	{
-		editor_polygon_t* polygon = &world->polygon;
+		editor_polygon_t* polygon = &world->layers[i].polygon;
 		r = fread(&polygon->vertexCount, sizeof(uint), 1, f);
 		assert(r == 1);
 		r = fread(polygon->vertexPosition, sizeof(vec2), polygon->vertexCount, f);
 		assert(r == polygon->vertexCount);
+
+		polygon->layer = i;
 	}
 
 	return 0;
@@ -484,14 +501,21 @@ void world_get_collision_info(world_collision_info_t* info, world_t* world)
 {
 	info->triangleCount	= world->colliders.triangleCount;
 	info->triangles		= world->colliders.triangles;
-	info->polygonCount	= 1;
-	info->polygons		= &world->polygon;
+	// info->polygonCount	= 1;
+	// info->polygons		= &world->polygon;
 }
+
+static editor_polygon_t* g_editInfoPolygons[PARALLAX_LAYER_COUNT];
 
 void world_get_edit_info(world_edit_info_t* info, world_t* world)
 {
-	info->polygonCount	= 1;
-	info->polygons		= &world->polygon;
+	for (int i = 0; i < PARALLAX_LAYER_COUNT; ++i)
+	{
+		g_editInfoPolygons[i] = &world->layers[i].polygon;
+	}
+
+	info->polygonCount	= PARALLAX_LAYER_COUNT;
+	info->polygons		= g_editInfoPolygons;
 }
 
 static void triangle_collider_debug_draw(triangle_collider_t* t)
@@ -505,8 +529,15 @@ static void triangle_collider_debug_draw(triangle_collider_t* t)
 	DrawDebugLine(v2, v0);
 }
 
-static void editor_polygon_debug_draw(editor_polygon_t* p)
+float world_get_parallax_layer_depth(uint layerIndex)
 {
+	return (layerIndex / (float)PARALLAX_LAYER_COUNT) * -20.0f;
+}
+
+void editor_polygon_debug_draw(editor_polygon_t* p)
+{
+	const float depth = world_get_parallax_layer_depth(p->layer);
+
 	for (size_t i = 0; i < p->vertexCount; ++i)
 	{
 		const size_t j = (i + 1) % p->vertexCount;
@@ -514,8 +545,8 @@ static void editor_polygon_debug_draw(editor_polygon_t* p)
 		const vec2 p0 = p->vertexPosition[i];
 		const vec2 p1 = p->vertexPosition[j];
 
-		const debug_vertex_t v0 = { .x = p0.x, .y = p0.y, .color = 0xffffffff };
-		const debug_vertex_t v1 = { .x = p1.x, .y = p1.y, .color = 0xffffffff };
+		const debug_vertex_t v0 = { .x = p0.x, .y = p0.y, .z = depth, .color = 0xffffffff };
+		const debug_vertex_t v1 = { .x = p1.x, .y = p1.y, .z = depth, .color = 0xffffffff };
 		DrawDebugLine(v0, v1);
 	}
 
@@ -539,7 +570,7 @@ static void editor_polygon_debug_draw(editor_polygon_t* p)
 
 		const bool isConvex = da < 0.0f;
 		
-		DrawDebugPoint((debug_vertex_t){ .x = p1.x, .y = p1.y, .color = isConvex ? 0xff00ff00 : 0xff0000ff });
+		DrawDebugPoint((debug_vertex_t){ .x = p1.x, .y = p1.y, .z = depth, .color = isConvex ? 0xff00ff00 : 0xff0000ff });
 	}
 }
 
