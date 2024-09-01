@@ -485,6 +485,7 @@ int CreateVulkanContext(vulkan_t* vulkan, VkInstance instance, VkSurfaceKHR surf
 			.multiDrawIndirect = VK_TRUE,
 			.geometryShader = VK_TRUE,
 			.shaderTessellationAndGeometryPointSize = VK_TRUE,
+			.wideLines = VK_TRUE,
 		},
 	};
 

@@ -392,7 +392,7 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 				}
 			}
 
-			printf("World triangles: %u, vertices: %u\n", ctx.indexCount / 3u, ctx.vertexCount);
+			//printf("World triangles: %u, vertices: %u\n", ctx.indexCount / 3u, ctx.vertexCount);
 
 			world->indexCount = ctx.indexCount;
 			
