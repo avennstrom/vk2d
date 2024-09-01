@@ -4,7 +4,7 @@
 #include "vulkan.h"
 
 #define SCENE_COLOR_FORMAT VK_FORMAT_R16G16B16A16_SFLOAT
-#define SCENE_DEPTH_FORMAT VK_FORMAT_D16_UNORM
+#define SCENE_DEPTH_FORMAT VK_FORMAT_D32_SFLOAT
 #define SPOT_LIGHT_RESOLUTION 256
 
 typedef struct dedicated_render_target {
