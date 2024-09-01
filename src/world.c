@@ -4,6 +4,7 @@
 #include "vec.h"
 #include "util.h"
 #include "rng.h"
+#include "profiler.h"
 
 #include <stdlib.h>
 #include <math.h>
@@ -385,7 +386,9 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 			{
 				if (world->visibleLayerMask & (1u << i))
 				{
+					PROFILER_BEGIN(fill_primitive_data);
 					fill_primitive_data(&ctx, &world->layers[i].polygon, i);
+					PROFILER_END();
 				}
 			}
 
@@ -395,6 +398,8 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 			
 			PushStagingMemoryFlush(rc->stagingMemory, world->stagingBufferMemory, WORLD_STAGING_BUFFER_SIZE);
 			
+			PROFILER_BEGIN(staging_copy);
+
 			{
 				const VkBufferCopy copyRegion = {
 					.size = WORLD_INDEX_BUFFER_SIZE,
@@ -415,6 +420,8 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 				};
 				vkCmdCopyBuffer(cb, world->stagingBuffer, world->vertexColorBuffer, 1, &copyRegion);
 			}
+
+			PROFILER_END();
 
 			//world->state = WORLD_STATE_DONE;
 			break;
@@ -530,7 +537,7 @@ static void triangle_collider_debug_draw(triangle_collider_t* t)
 
 float world_get_parallax_layer_depth(uint layerIndex)
 {
-	return (layerIndex / (float)PARALLAX_LAYER_COUNT) * -20.0f;
+	return layerIndex * -4.0f;
 }
 
 void editor_polygon_debug_draw(editor_polygon_t* p)

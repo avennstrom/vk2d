@@ -107,7 +107,7 @@ FsOutput fs_main(VsOutput input)
 	float3 albedo = input.color;
 	//albedo = input.normal;
 
-	const float fogAmount = (-input.depth) * 0.02f;
+	const float fogAmount = (-input.depth) * 0.01f;
 
 	albedo = lerp(albedo, float3(1.0f, 1.0f, 1.0f), fogAmount);
 

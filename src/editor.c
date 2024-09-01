@@ -385,7 +385,11 @@ void editor_render(scb_t* scb, editor_t* editor, uint2 resolution)
 		}
 	}
 
-	if (editor->closestPolygon != NULL)
+	if (editor->editPolygon != NULL)
+	{
+		editor_polygon_debug_draw(editor->editPolygon);
+	}
+	else if (editor->closestPolygon != NULL)
 	{
 		editor_polygon_t* polygon = editor->closestPolygon;
 		const float depth = world_get_parallax_layer_depth(polygon->layer);

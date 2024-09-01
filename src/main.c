@@ -23,6 +23,7 @@
 #include "editor.h"
 #include "wind.h"
 #include "particles.h"
+#include "profiler.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -507,6 +508,8 @@ int main(int argc, char **argv)
 		{
 			tickAccumulator -= DELTA_TIME_MS;
 
+			PROFILER_BEGIN(tick);
+
 			debug_renderer_clear_buffer(debugRenderer, DEBUG_RENDERER_BUFFER_TICK);
 
 			world_tick(world);
@@ -518,6 +521,8 @@ int main(int argc, char **argv)
 
 			wind_tick(wind);
 			particles_tick(particles);
+
+			PROFILER_END();
 		}
 
 		debug_renderer_set_current_buffer(debugRenderer, DEBUG_RENDERER_BUFFER_FRAME);
@@ -535,11 +540,15 @@ int main(int argc, char **argv)
 
 		if (appMode == APP_MODE_GAME)
 		{
+			PROFILER_BEGIN(game_render);
 			game_render(scb, game);
+			PROFILER_END();
 		}
 		else if (appMode == APP_MODE_EDIT)
 		{
+			PROFILER_BEGIN(editor_render);
 			editor_render(scb, editor, resolution);
+			PROFILER_END();
 		}
 		
 		VkCommandBuffer cb = frame->cb;
@@ -558,11 +567,24 @@ int main(int argc, char **argv)
 			.dsalloc = &dsalloc,
 		};
 
-		model_loader_update(cb, modelLoader, &rc);
-		//terrain_update(cb, terrain, &rc);
-		world_update(world, cb, &rc);
-		wind_update(cb, wind, &rc);
-		particles_render(particles, &rc);
+		PROFILER_BEGIN(update);
+		{
+			model_loader_update(cb, modelLoader, &rc);
+			//terrain_update(cb, terrain, &rc);
+
+			PROFILER_BEGIN(world_update);
+			world_update(world, cb, &rc);
+			PROFILER_END();
+
+			PROFILER_BEGIN(wind_update);
+			wind_update(cb, wind, &rc);
+			PROFILER_END();
+
+			PROFILER_BEGIN(particles_render);
+			particles_render(particles, &rc);
+			PROFILER_END();
+		}
+		PROFILER_END();
 
 		{
 			const VkMemoryBarrier memoryBarriers[] = {
@@ -596,12 +618,14 @@ int main(int argc, char **argv)
 			.rt = &rt,
 		};
 
+		PROFILER_BEGIN(scene_draw);
 		scene_draw(
 			cb,
 			scene,
 			scb,
 			&rc,
 			&src);
+		PROFILER_END();
 
 		const VkImage backbufferImage = swapchain.backbuffer[imageIndex];
 		const VkImageView backbufferView = swapchain.backbufferView[imageIndex];
@@ -748,6 +772,8 @@ int main(int argc, char **argv)
 		app.currentFrame = (app.currentFrame + 1) % FRAME_COUNT;
 
 		++frameId;
+
+		PROFILER_FRAME_MARK();
 	}
 
 	vkDeviceWaitIdle(vulkan.device);
