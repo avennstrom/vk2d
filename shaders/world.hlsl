@@ -13,6 +13,7 @@ struct VsInput
 struct VsOutput
 {
 	float3 color : TEXCOORD0;
+	float depth : TEXCOORD1;
 	float4 position : SV_Position;
 };
 
@@ -86,6 +87,7 @@ VsOutput vs_main(VsInput input)
 
 	output.color	= unpackVertexColor(vertexColorPacked);
 	output.position	= mul(float4(vertexPosition, 1.0), g_frame.matViewProj);
+	output.depth	= vertexPosition.z;
 
 	output.position.y *= -1;
 	return output;
@@ -100,12 +102,14 @@ FsOutput fs_main(VsOutput input)
 {
 	FsOutput output = (FsOutput)0;
 
-	const float depth = input.position.z / input.position.w;
+	//const float depth = input.position.z / input.position.w;
 
 	float3 albedo = input.color;
 	//albedo = input.normal;
 
-	albedo = lerp(albedo, float3(1.0f, 1.0f, 1.0f), pow(max(0,depth - 6.0f), 2.0f) * 0.0008f);
+	const float fogAmount = (-input.depth) * 0.02f;
+
+	albedo = lerp(albedo, float3(1.0f, 1.0f, 1.0f), fogAmount);
 
 	float3 color = 0.0f.rrr;
 	

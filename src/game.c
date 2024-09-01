@@ -558,5 +558,7 @@ int game_render(scb_t* scb, game_t* game)
 		0xff00ffff
 	);
 
+	world_set_visible_layers(game->world, 0xffffffffu);
+
 	return 0;
 }

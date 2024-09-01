@@ -283,7 +283,7 @@ static void particles_footstep_dust_render(gpu_particle_t* gpuParticles, const p
 
 		gpuParticles[i] = (gpu_particle_t){
 			.center = p->pos,
-			.color = 0xff001020,
+			.color = 0xff00222f,
 			.sizeAndLayer = pack_size_and_layer(lerpf(0.2f, 0.0f, tage), 0),
 		};
 	}

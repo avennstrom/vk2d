@@ -1,16 +1,19 @@
 #include "editor.h"
 #include "vec.h"
+#include "intersection.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <float.h>
 #include <math.h>
+#include <assert.h>
 
 typedef struct editor_camera
 {
 	vec2	pos;
 	vec2	origin;
 	float	height;
+	float	zoom;
 
 	mat4	transform;
 	mat4	viewMatrix;
@@ -35,6 +38,8 @@ typedef struct editor
 	uint				editVertex;
 
 	bool				insertMode;
+
+	int					firstVisibleLayer;
 } editor_t;
 
 static void update_camera_matrices(editor_camera_t* camera, float aspectRatio);
@@ -77,6 +82,40 @@ static vec2 editor_project_screen_to_world(const editor_t* editor, int2 screen)
 	return vec2_add(ws, camera->origin);
 }
 
+static vec2 editor_project_world_to_screen(const editor_camera_t* camera, vec3 p)
+{
+	vec4 pp = mat_mul_vec4(camera->viewProjectionMatrix, (vec4){p.x, p.y, p.z, 1.0f});
+	pp.x /= pp.w;
+	pp.y /= pp.w;
+	pp.z /= pp.w;
+	pp.x *= 0.5f;
+	pp.y *= -0.5f;
+	pp.x += 0.5f;
+	pp.y += 0.5f;
+	return (vec2){pp.x, pp.y};
+}
+
+static void editor_create_camera_ray(vec3* origin, vec3* direction, const editor_camera_t* camera, vec2 uv)
+{
+	const mat4 inverseViewProjectionMatrix = mat_invert(camera->viewProjectionMatrix);
+
+	vec3 near;
+	vec3 far;
+
+	vec3 ndc;
+	ndc.x = uv.x * 2.0f - 1.0f;
+	ndc.y = uv.y * -2.0f + 1.0f;
+
+	ndc.z = 0.0f;
+	near = mat_mul_hom(inverseViewProjectionMatrix, (vec4){ndc.x, ndc.y, ndc.z, 1.0f});
+	
+	ndc.z = 1.0f;
+	far = mat_mul_hom(inverseViewProjectionMatrix, (vec4){ndc.x, ndc.y, ndc.z, 1.0f});
+
+	*direction = vec3_normalize(vec3_sub(far, near));
+	*origin = near;
+}
+
 void editor_window_event(editor_t* editor, const window_event_t* event)
 {
 	switch (event->type)
@@ -84,22 +123,25 @@ void editor_window_event(editor_t* editor, const window_event_t* event)
 		case WINDOW_EVENT_BUTTON_DOWN:
 			if (event->data.button.button == BUTTON_LEFT)
 			{
-				if (editor->insertMode)
+				if (editor->closestPolygon != NULL)
 				{
-					for (int i = editor->closestPolygon->vertexCount - 1; i > editor->closestVertex; --i)
+					if (editor->insertMode)
 					{
-						editor->closestPolygon->vertexPosition[i + 1] = editor->closestPolygon->vertexPosition[i];
-					}
-					++editor->closestPolygon->vertexCount;
-					editor->closestPolygon->vertexPosition[editor->closestVertex + 1] = editor_project_screen_to_world(editor, event->data.button.pos);
+						for (int i = editor->closestPolygon->vertexCount - 1; i > editor->closestVertex; --i)
+						{
+							editor->closestPolygon->vertexPosition[i + 1] = editor->closestPolygon->vertexPosition[i];
+						}
+						++editor->closestPolygon->vertexCount;
+						editor->closestPolygon->vertexPosition[editor->closestVertex + 1] = editor_project_screen_to_world(editor, event->data.button.pos);
 
-					editor->editPolygon	= editor->closestPolygon;
-					editor->editVertex	= editor->closestVertex + 1;
-				}
-				else
-				{
-					editor->editPolygon	= editor->closestPolygon;
-					editor->editVertex	= editor->closestVertex;
+						editor->editPolygon	= editor->closestPolygon;
+						editor->editVertex	= editor->closestVertex + 1;
+					}
+					else
+					{
+						editor->editPolygon	= editor->closestPolygon;
+						editor->editVertex	= editor->closestVertex;
+					}
 				}
 			}
 			if (event->data.button.button == BUTTON_RIGHT)
@@ -127,13 +169,23 @@ void editor_window_event(editor_t* editor, const window_event_t* event)
 		case WINDOW_EVENT_MOUSE_MOVE:
 			editor->mousePos = event->data.mouse.pos;
 			const vec2 mouseWorldPos = editor_project_screen_to_world(editor, event->data.mouse.pos);
+			const vec2 mouseUv = { editor->mousePos.x / (float)editor->resolution.x, editor->mousePos.y / (float)editor->resolution.y };
 			if (editor->mouseDragging)
 			{
 				editor->mouseDragTarget = mouseWorldPos;
 			}
 			if (editor->editPolygon != NULL)
 			{
-				editor->editPolygon->vertexPosition[editor->editVertex] = mouseWorldPos;
+				float depth = world_get_parallax_layer_depth(editor->editPolygon->layer);
+
+				vec3 origin;
+				vec3 direction;
+				editor_create_camera_ray(&origin, &direction, &editor->camera, mouseUv);
+				float hitDistance;
+				bool hit = intersect_ray_plane(&hitDistance, origin, direction, (vec4){0.0f, 0.0f, 1.0f, depth});
+				assert(hit);
+				const vec3 hitPosition = vec3_add(origin, vec3_scale(direction, hitDistance));
+				editor->editPolygon->vertexPosition[editor->editVertex] = vec3_xy(hitPosition);
 			}
 			break;
 		case WINDOW_EVENT_KEY_DOWN:
@@ -162,29 +214,31 @@ void editor_window_event(editor_t* editor, const window_event_t* event)
 			}
 			break;
 		case WINDOW_EVENT_MOUSE_SCROLL:
-			if (event->data.scroll.delta > 0)
+			if (editor->insertMode)
 			{
-				editor->camera.height *= 0.7f;
+				editor->firstVisibleLayer += event->data.scroll.delta;
+				if (editor->firstVisibleLayer >= PARALLAX_LAYER_COUNT)
+				{
+					editor->firstVisibleLayer = PARALLAX_LAYER_COUNT - 1;
+				}
+				if (editor->firstVisibleLayer < 0)
+				{
+					editor->firstVisibleLayer = 0;
+				}
 			}
-			if (event->data.scroll.delta < 0)
+			else
 			{
-				editor->camera.height *= 1.3f;
+				if (event->data.scroll.delta > 0)
+				{
+					editor->camera.zoom -= 1.0f;
+				}
+				if (event->data.scroll.delta < 0)
+				{
+					editor->camera.zoom += 1.0f;
+				}
 			}
 			break;
 	}
-}
-
-static vec2 editor_project_world_to_screen(const editor_camera_t* camera, vec3 p)
-{
-	vec4 pp = mat_mul_vec4(camera->viewProjectionMatrix, (vec4){p.x, p.y, p.z, 1.0f});
-	pp.x /= pp.w;
-	pp.y /= pp.w;
-	pp.z /= pp.w;
-	pp.x *= 0.5f;
-	pp.y *= -0.5f;
-	pp.x += 0.5f;
-	pp.y += 0.5f;
-	return (vec2){pp.x, pp.y};
 }
 
 void editor_render(scb_t* scb, editor_t* editor, uint2 resolution)
@@ -196,20 +250,49 @@ void editor_render(scb_t* scb, editor_t* editor, uint2 resolution)
 
 	world_edit_info_t worldInfo;
 	world_get_edit_info(&worldInfo, editor->world);
+	
+	uint32_t visibleLayerMask = 0xffffffffu;
+	visibleLayerMask &= ~((1 << editor->firstVisibleLayer) - 1);
+	world_set_visible_layers(editor->world, visibleLayerMask);
 
 	editor->closestPolygon = NULL;
 	float closestDistance = FLT_MAX;
 
-	for (int polygonIndex = 0; polygonIndex < worldInfo.polygonCount; ++polygonIndex)
+	for (int polygonIndex = editor->firstVisibleLayer; polygonIndex < worldInfo.polygonCount; ++polygonIndex)
 	{
 		editor_polygon_t* polygon = worldInfo.polygons[polygonIndex];
-
-		// const vec2 worldMousePos = editor_project_screen_to_world(editor, editor->mousePos);
-		// DrawDebugPoint((debug_vertex_t){.x = worldMousePos.x, .y = worldMousePos.y, .color = 0xff00ffff});
-
+		const float polygonDepth = world_get_parallax_layer_depth(polygon->layer);
+		
 		const vec2 mouseUv = { editor->mousePos.x / (float)resolution.x, editor->mousePos.y / (float)resolution.y };
-
 		const editor_camera_t* camera = &editor->camera;
+
+		triangle_t triangles[256];
+		size_t triangleCount;
+		editor_polygon_triangulate(triangles, &triangleCount, polygon);
+
+		bool isMouseInsideTriangle = false;
+
+		for (int triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex)
+		{
+			const triangle_t* triangle = &triangles[triangleIndex];
+			const vec2 v0 = polygon->vertexPosition[triangle->i[0]];
+			const vec2 v1 = polygon->vertexPosition[triangle->i[1]];
+			const vec2 v2 = polygon->vertexPosition[triangle->i[2]];
+			const vec2 pv0 = editor_project_world_to_screen(camera, (vec3){v0.x, v0.y, polygonDepth});
+			const vec2 pv1 = editor_project_world_to_screen(camera, (vec3){v1.x, v1.y, polygonDepth});
+			const vec2 pv2 = editor_project_world_to_screen(camera, (vec3){v2.x, v2.y, polygonDepth});
+			
+			if (intersect_point_triangle_2d(mouseUv, pv0, pv1, pv2))
+			{
+				isMouseInsideTriangle = true;
+				break;
+			}
+		}
+
+		if (!isMouseInsideTriangle)
+		{
+			continue;
+		}
 		
 		if (editor->insertMode)
 		{
@@ -221,8 +304,8 @@ void editor_render(scb_t* scb, editor_t* editor, uint2 resolution)
 			{
 				const uint j = (i + 1) % polygon->vertexCount;
 				
-				const vec2 a = editor_project_world_to_screen(camera, (vec3){polygon->vertexPosition[i].x, polygon->vertexPosition[i].y, world_get_parallax_layer_depth(polygon->layer)});
-				const vec2 b = editor_project_world_to_screen(camera, (vec3){polygon->vertexPosition[j].x, polygon->vertexPosition[j].y, world_get_parallax_layer_depth(polygon->layer)});
+				const vec2 a = editor_project_world_to_screen(camera, (vec3){polygon->vertexPosition[i].x, polygon->vertexPosition[i].y, polygonDepth});
+				const vec2 b = editor_project_world_to_screen(camera, (vec3){polygon->vertexPosition[j].x, polygon->vertexPosition[j].y, polygonDepth});
 				const vec2 tangent = vec2_normalize(vec2_sub(b, a));
 				const vec2 normal = {-tangent.y, tangent.x};
 				
@@ -273,9 +356,9 @@ void editor_render(scb_t* scb, editor_t* editor, uint2 resolution)
 			for (uint i = 0; i < polygon->vertexCount; ++i)
 			{
 				const vec2 p2 = polygon->vertexPosition[i];
-				const float depth = (polygon->layer / (float)PARALLAX_LAYER_COUNT) * -10.0f;
+				//const float depth = world_get_parallax_layer_depth(polygon->layer);
 				
-				const vec2 pp = editor_project_world_to_screen(camera, (vec3){p2.x, p2.y, depth});
+				const vec2 pp = editor_project_world_to_screen(camera, (vec3){p2.x, p2.y, polygonDepth});
 				//DrawDebugPoint2D((debug_vertex_t){.x = pp.x, .y = pp.y, .color = 0xffff00ff});
 
 				//printf("%.1f, %.1f\n", pp.x, pp.y);
@@ -294,6 +377,11 @@ void editor_render(scb_t* scb, editor_t* editor, uint2 resolution)
 				editor->closestPolygon	= polygon;
 				editor->closestVertex	= closestVertex;
 			}
+		}
+		
+		if (isMouseInsideTriangle)
+		{
+			break;
 		}
 	}
 
@@ -335,15 +423,30 @@ void editor_render(scb_t* scb, editor_t* editor, uint2 resolution)
 
 static void update_camera_matrices(editor_camera_t* camera, float aspectRatio)
 {
-	mat4 m = mat_identity();
-	m = mat_translate(m, (vec3){ camera->pos.x, camera->pos.y, 10.0f });
+	float zoomOffset = camera->zoom;
+	float fovOffset = camera->zoom * 2.0f;
+	
+	if (zoomOffset < 0.0f)
+	{
+		zoomOffset = 0.0f;
+	}
 
-	const vec2 viewSize = {camera->height * aspectRatio, camera->height};
+	if (fovOffset > 0.0f)
+	{
+		fovOffset = 0.0f;
+	}
+
+	zoomOffset = powf(zoomOffset, 1.5f);
+
+	mat4 m = mat_identity();
+	m = mat_translate(m, (vec3){ camera->pos.x, camera->pos.y, CAMERA_OFFSET + zoomOffset });
+
+	//const vec2 viewSize = {camera->height * aspectRatio, camera->height};
 
 	camera->transform = m;
 	camera->viewMatrix = mat_invert(m);
 	//const mat4 projectionMatrix = mat_orthographic(viewSize, 0.0f, 1.0f);
-	camera->projectionMatrix = mat_perspective(CAMERA_FOV, aspectRatio, CAMERA_NEAR, CAMERA_FAR);
+	camera->projectionMatrix = mat_perspective(CAMERA_FOV + fovOffset, aspectRatio, CAMERA_NEAR, CAMERA_FAR);
 	camera->viewProjectionMatrix = mat_mul(camera->viewMatrix, camera->projectionMatrix);
 }
 

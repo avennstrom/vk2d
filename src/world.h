@@ -70,3 +70,13 @@ void world_get_edit_info(world_edit_info_t* info, world_t* world);
 
 float world_get_parallax_layer_depth(uint layerIndex);
 void editor_polygon_debug_draw(editor_polygon_t* p);
+
+
+typedef struct triangle
+{
+	uint32_t i[3];
+} triangle_t;
+
+void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCount, const editor_polygon_t* polygon);
+
+void world_set_visible_layers(world_t* world, uint32_t mask);

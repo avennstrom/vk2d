@@ -9,9 +9,9 @@
 #include <math.h>
 #include <assert.h>
 
-#define WORLD_MAX_INDEX_COUNT (256 * 1024)
-#define WORLD_MAX_VERTEX_COUNT (256 * 1024)
-#define WORLD_INDEX_BUFFER_SIZE (WORLD_MAX_INDEX_COUNT * sizeof(uint16_t))
+#define WORLD_MAX_INDEX_COUNT (1024 * 1024)
+#define WORLD_MAX_VERTEX_COUNT (1024 * 1024)
+#define WORLD_INDEX_BUFFER_SIZE (WORLD_MAX_INDEX_COUNT * sizeof(uint32_t))
 #define WORLD_POSITION_BUFFER_SIZE (WORLD_MAX_VERTEX_COUNT * sizeof(vec3))
 #define WORLD_COLOR_BUFFER_SIZE (WORLD_MAX_VERTEX_COUNT * sizeof(uint32_t))
 #define WORLD_STAGING_BUFFER_SIZE (WORLD_INDEX_BUFFER_SIZE + WORLD_POSITION_BUFFER_SIZE + WORLD_COLOR_BUFFER_SIZE)
@@ -53,6 +53,7 @@ typedef struct world
 	VkBuffer			stagingBuffer;
 	void*				stagingBufferMemory;
 
+	uint32_t			visibleLayerMask;
 	parallax_layer_t	layers[PARALLAX_LAYER_COUNT];
 	world_colliders_t	colliders;
 
@@ -60,14 +61,8 @@ typedef struct world
 	float				pollenTimer;
 } world_t;
 
-typedef struct triangle
-{
-	uint32_t i[3];
-} triangle_t;
-
 static void triangle_collider_debug_draw(triangle_collider_t* t);
 void editor_polygon_debug_draw(editor_polygon_t* p);
-static void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCount, const editor_polygon_t* polygon);
 
 world_t* world_create(vulkan_t* vulkan, particles_t* particles)
 {
@@ -77,8 +72,9 @@ world_t* world_create(vulkan_t* vulkan, particles_t* particles)
 		return NULL;
 	}
 
-	world->vulkan		= vulkan;
-	world->particles	= particles;
+	world->vulkan			= vulkan;
+	world->particles		= particles;
+	world->visibleLayerMask	= 0xffffffffu;
 	
 	world->indexBuffer = CreateBuffer(
 		&world->indexBufferMemory,
@@ -104,13 +100,13 @@ world_t* world_create(vulkan_t* vulkan, particles_t* particles)
 	for (int i = 0; i < PARALLAX_LAYER_COUNT; ++i)
 	{
 		editor_polygon_t* polygon = &world->layers[i].polygon;
-		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-5.0f, 1.0f};
-		polygon->vertexPosition[polygon->vertexCount++] = (vec2){0.0f, 0.1f};
-		polygon->vertexPosition[polygon->vertexCount++] = (vec2){5.0f, 0.1f};
-		polygon->vertexPosition[polygon->vertexCount++] = (vec2){10.0f, -0.5f};
-		polygon->vertexPosition[polygon->vertexCount++] = (vec2){5.0f, -1.0f};
-		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-5.0f, -1.0f};
 		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-10.0f, 0.0f};
+		polygon->vertexPosition[polygon->vertexCount++] = (vec2){10.0f, 0.0f};
+		polygon->vertexPosition[polygon->vertexCount++] = (vec2){10.0f, -10.0f};
+		polygon->vertexPosition[polygon->vertexCount++] = (vec2){-10.0f, -10.0f};
+		// polygon->vertexPosition[polygon->vertexCount++] = (vec2){5.0f, -1.0f};
+		// polygon->vertexPosition[polygon->vertexCount++] = (vec2){-5.0f, -1.0f};
+		// polygon->vertexPosition[polygon->vertexCount++] = (vec2){-10.0f, 0.0f};
 		polygon->layer = i;
 	}
 
@@ -147,7 +143,7 @@ void world_alloc_staging_mem(staging_memory_allocator_t* allocator, world_t* wor
 
 typedef struct primitive_context
 {
-	uint16_t*	indices;
+	uint32_t*	indices;
 	vec3*		positions;
 	uint32_t*	colors;
 	
@@ -275,7 +271,7 @@ static void fill_primitive_data(primitive_context_t* ctx, const editor_polygon_t
 	{
 		const vec2 p = polygon->vertexPosition[i];
 		ctx->positions[ctx->vertexCount + i] = (vec3){ p.x, p.y, depth };
-		ctx->colors[ctx->vertexCount + i] = 0x001020;
+		ctx->colors[ctx->vertexCount + i] = 0x00222f;
 	}
 
 	ctx->vertexCount += polygon->vertexCount;
@@ -373,7 +369,7 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 			}
 			world->stagingCounter = 0;
 
-			uint16_t* stagingIndices = (uint16_t*)world->stagingBufferMemory;
+			uint32_t* stagingIndices = (uint32_t*)world->stagingBufferMemory;
 			vec3* stagingPositions = (vec3*)((uint8_t*)world->stagingBufferMemory + WORLD_INDEX_BUFFER_SIZE);
 			uint32_t* stagingColors = (uint32_t*)((uint8_t*)world->stagingBufferMemory + WORLD_INDEX_BUFFER_SIZE + WORLD_POSITION_BUFFER_SIZE);
 
@@ -387,10 +383,13 @@ void world_update(world_t* world, VkCommandBuffer cb, const render_context_t* rc
 
 			for (int i = 0; i < PARALLAX_LAYER_COUNT; ++i)
 			{
-				fill_primitive_data(&ctx, &world->layers[i].polygon, i);
+				if (world->visibleLayerMask & (1u << i))
+				{
+					fill_primitive_data(&ctx, &world->layers[i].polygon, i);
+				}
 			}
 
-			//printf("World triangles: %u, vertices: %u\n", ctx.indexCount / 3u, ctx.vertexCount);
+			printf("World triangles: %u, vertices: %u\n", ctx.indexCount / 3u, ctx.vertexCount);
 
 			world->indexCount = ctx.indexCount;
 			
@@ -466,9 +465,9 @@ int world_deserialize(world_t* world, FILE* f)
 	uint polygonCount;
 	r = fread(&polygonCount, sizeof(uint), 1, f);
 	assert(r == 1);
-	assert(polygonCount == PARALLAX_LAYER_COUNT);
+	assert(polygonCount <= PARALLAX_LAYER_COUNT);
 	
-	for (int i = 0; i < PARALLAX_LAYER_COUNT; ++i)
+	for (int i = 0; i < polygonCount; ++i)
 	{
 		editor_polygon_t* polygon = &world->layers[i].polygon;
 		r = fread(&polygon->vertexCount, sizeof(uint), 1, f);
@@ -575,7 +574,7 @@ void editor_polygon_debug_draw(editor_polygon_t* p)
 }
 
 // https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf
-static void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCount, const editor_polygon_t* p)
+void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCount, const editor_polygon_t* p)
 {
 	*triangleCount = 0;
 
@@ -696,4 +695,9 @@ static void editor_polygon_triangulate(triangle_t* triangles, size_t* triangleCo
 	triangle->i[0] = workingSet[0];
 	triangle->i[1] = workingSet[1];
 	triangle->i[2] = workingSet[2];
+}
+
+void world_set_visible_layers(world_t* world, uint32_t mask)
+{
+	world->visibleLayerMask = mask;
 }

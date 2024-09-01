@@ -917,7 +917,7 @@ void scene_draw(
 
 				vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->worldPipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 				vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->worldPipeline);
-				vkCmdBindIndexBuffer(cb, worldInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+				vkCmdBindIndexBuffer(cb, worldInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 				vkCmdDrawIndexed(cb, worldInfo.indexCount, 1, 0, 0, 0);
 			}
 
